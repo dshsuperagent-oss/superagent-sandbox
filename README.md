@@ -249,6 +249,7 @@ node tools/blender-director/test/e2e.js                # teste sem Blender
 
 - Código, contrato JSON e limitações: [`tools/blender-director/README.md`](tools/blender-director/README.md) e [`schema.md`](tools/blender-director/schema.md).
 - Pesquisa técnica que embasa as decisões: [`docs/pesquisa-blender-3d.md`](docs/pesquisa-blender-3d.md).
+- Fase 1 da v2 (pedido → plano → crítico esqueleto): [`docs/pesquisa-agentes-blender.md`](docs/pesquisa-agentes-blender.md) e [`docs/spec-blender-director-v2.md`](docs/spec-blender-director-v2.md).
 
 ## Pesquisa
 

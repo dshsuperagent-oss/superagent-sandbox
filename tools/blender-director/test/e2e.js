@@ -148,6 +148,14 @@ function openEventStream(baseUrl) {
 async function main() {
   checkSyntax();
 
+  const plannerRun = spawnSync(process.execPath, [path.join(__dirname, 'planner-e2e.js')], { encoding: 'utf8' });
+  if (plannerRun.status !== 0) {
+    process.stderr.write(plannerRun.stdout || '');
+    process.stderr.write(plannerRun.stderr || '');
+    throw new Error('teste de fixture do planner/crítico falhou');
+  }
+  log('[ok] planner e crítico passaram no teste de fixture');
+
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blender-director-e2e-'));
   const serverStarted = new Promise((resolve, reject) => {
     const child = spawn(
@@ -431,6 +439,33 @@ async function main() {
     const missingExample = await request('GET', '/examples/nao-existe.json');
     assert.equal(missingExample.status, 404);
     log('[ok] 404 para preview inexistente e exemplos servidos');
+
+    // 17b. Planner v2 (aditivo): pedido em texto -> plano + scene-spec
+    const requestExample = await request('GET', '/requests/request-produto.txt');
+    assert.equal(requestExample.status, 200);
+    assert.match(requestExample.text, /perfume/i);
+    const planResponse = await request('POST', '/plan', { request: requestExample.text.trim() });
+    assert.equal(planResponse.status, 200, planResponse.text);
+    assert.equal(planResponse.json.planVersion, 1);
+    assert.equal(planResponse.json.source, 'rules');
+    assert.ok(Array.isArray(planResponse.json.steps) && planResponse.json.steps.length >= 8);
+    assert.ok(planResponse.json.sceneSpec && planResponse.json.sceneSpec.objects.length >= 1);
+    assert.ok(planResponse.json.critic.metrics.includes('ssim'));
+    const emptyPlan = await request('POST', '/plan', { request: '   ' });
+    assert.equal(emptyPlan.status, 400);
+    const invalidPlan = await request('POST', '/plan', {});
+    assert.equal(invalidPlan.status, 400);
+    const planJob = await request('POST', '/jobs', planResponse.json.sceneSpec);
+    assert.equal(planJob.status, 202, planJob.text);
+    assert.match(planJob.json.id, /^[a-f0-9]{16}$/);
+    const planJobId = planJob.json.id;
+    await waitForState((state) => state.jobs.some((job) => job.id === planJobId && job.state === 'waiting'));
+    const planApproved = await request('POST', `/jobs/${planJobId}/approve`, {});
+    assert.equal(planApproved.status, 202);
+    await waitForState((state) => state.jobs.some((job) => job.id === planJobId && job.state === 'done'));
+    const missingRequest = await request('GET', '/requests/request-nao-existe.txt');
+    assert.equal(missingRequest.status, 404);
+    log('[ok] /plan e /requests: pedido -> plano -> scene-spec aceita por POST /jobs');
 
     // 18. Nenhum job terminou em erro
     const finalState = await fetchState();
