@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Blender Director: preview em tempo real, comandos incrementais e aprovação do render final.">
+<title>Blender Director — preview e aprovação</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #101216;
+    --bg-elevated: #181b21;
+    --bg-panel: #1c1f26;
+    --bg-input: #121419;
+    --border: #2b303a;
+    --border-soft: #232830;
+    --text: #e6e9ee;
+    --muted: #98a1af;
+    --dim: #6c7581;
+    --accent: #f2a65a;
+    --accent-strong: #ffb066;
+    --accent-soft: rgba(242, 166, 90, 0.14);
+    --ok: #67d391;
+    --warn: #e7c15d;
+    --error: #ff7373;
+    --error-soft: rgba(255, 115, 115, 0.12);
+    --radius: 12px;
+    --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(242, 166, 90, 0.07), transparent 60%),
+      radial-gradient(900px 500px at 110% 0%, rgba(88, 130, 255, 0.06), transparent 55%),
+      var(--bg);
+    font-size: 14px;
+  }
+  button, select, textarea, input { font-family: inherit; font-size: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: 0.45; }
+  code, .mono { font-family: var(--mono); }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(16, 18, 22, 0.86);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: linear-gradient(145deg, #ffcf9b, #e2863b);
+    color: #221305; font-weight: 800; font-size: 17px;
+    box-shadow: 0 4px 18px rgba(242, 166, 90, 0.28);
+  }
+  .brand h1 { font-size: 16px; letter-spacing: 0.01em; margin: 0; font-weight: 650; }
+  .brand p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
+  .badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+  .badge.fixture { color: var(--warn); border-color: rgba(231, 193, 93, 0.35); background: rgba(231, 193, 93, 0.08); }
+  .badge.real { color: var(--ok); border-color: rgba(103, 211, 145, 0.35); background: rgba(103, 211, 145, 0.08); }
+  .conn { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); box-shadow: 0 0 0 3px rgba(108, 117, 129, 0.12); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(103, 211, 145, 0.14); }
+  .dot.off { background: var(--error); box-shadow: 0 0 0 3px rgba(255, 115, 115, 0.14); }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 18px;
+    padding: 18px 22px 30px;
+    max-width: 1680px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 1080px) {
+    main { grid-template-columns: 1fr; }
+    aside { order: 2; }
+  }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(255,255,255,0.012), transparent 160px), var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    padding: 15px 18px 13px; border-bottom: 1px solid var(--border-soft);
+  }
+  .panel-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+  .panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .state-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+  .state-pill.waiting { color: var(--accent); border-color: rgba(242,166,90,0.4); background: var(--accent-soft); }
+  .state-pill.running { color: #9dc0ff; border-color: rgba(157,192,255,0.4); background: rgba(157,192,255,0.1); }
+  .state-pill.done { color: var(--ok); border-color: rgba(103,211,145,0.4); background: rgba(103,211,145,0.1); }
+  .state-pill.error { color: var(--error); border-color: rgba(255,115,115,0.4); background: var(--error-soft); }
+  .state-pill.queued { color: var(--muted); }
+
+  .timeline { display: flex; gap: 0; padding: 13px 18px 6px; overflow-x: auto; }
+  .timeline .step { display: flex; align-items: center; gap: 7px; color: var(--dim); font-size: 11.5px; white-space: nowrap; }
+  .timeline .step + .step::before { content: ""; width: 14px; height: 1px; background: var(--border); margin: 0 8px; }
+  .timeline .step .n {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 10px; font-weight: 700;
+    border: 1px solid var(--border); background: var(--bg-input); color: var(--dim);
+    flex: none;
+  }
+  .timeline .step.complete { color: var(--muted); }
+  .timeline .step.complete .n { color: var(--ok); border-color: rgba(103,211,145,0.45); background: rgba(103,211,145,0.1); }
+  .timeline .step.active { color: var(--accent); }
+  .timeline .step.active .n { color: #2a1707; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .timeline .step.error .n { color: #fff; background: var(--error); border-color: var(--error); }
+
+  .substep { padding: 2px 18px 10px; color: var(--dim); font-size: 11.5px; min-height: 18px; }
+  .substep .mono { color: var(--muted); }
+
+  .error-banner {
+    margin: 0 18px 12px; padding: 10px 12px; border-radius: 9px;
+    border: 1px solid rgba(255,115,115,0.35); background: var(--error-soft);
+    color: #ffc2c2; font-size: 12.5px; line-height: 1.45;
+  }
+
+  .images { padding: 4px 18px 0; display: grid; gap: 14px; }
+  .image-card { border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; background: var(--bg-input); }
+  .image-head {
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    padding: 8px 11px; font-size: 11.5px; color: var(--muted);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .image-head strong { color: var(--text); font-weight: 600; font-size: 12px; }
+  .image-head .tag { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+  .image-body { min-height: 240px; display: grid; place-items: center; position: relative; }
+  .image-body img { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; background: #0a0b0e; }
+  .image-body.final img { max-height: 52vh; }
+  .empty {
+    color: var(--dim); font-size: 12.5px; text-align: center; padding: 44px 18px; line-height: 1.55;
+  }
+  .spinner {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite; margin: 0 auto 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .actions { display: flex; gap: 9px; flex-wrap: wrap; padding: 15px 18px 8px; }
+  .btn {
+    border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);
+    padding: 9px 13px; border-radius: 9px; font-weight: 550; font-size: 12.5px;
+    transition: border-color 0.15s, background 0.15s, transform 0.05s;
+  }
+  .btn:hover:not(:disabled) { border-color: #3b424e; background: #20242c; }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn.primary {
+    background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+    color: #2a1707; border-color: #d98a40; font-weight: 700;
+  }
+  .btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #ffc18a, #ffab63); }
+  .btn.ghost { background: transparent; }
+  .flash { padding: 0 18px 14px; font-size: 12px; min-height: 18px; color: var(--muted); }
+  .flash.ok { color: var(--ok); }
+  .flash.err { color: var(--error); }
+
+  .metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 1px; background: var(--border-soft); border-top: 1px solid var(--border-soft);
+  }
+  .metric { background: var(--bg-panel); padding: 10px 14px; }
+  .metric .k { color: var(--dim); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .metric .v { margin-top: 3px; font-size: 12.5px; color: var(--text); font-family: var(--mono); line-height: 1.4; }
+  .metric .sub { margin-top: 2px; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+  .metric .v small { color: var(--muted); font-family: inherit; font-size: 11px; }
+
+  aside { display: grid; gap: 14px; }
+  .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .card h2 { margin: 0; padding: 12px 14px; font-size: 12.5px; font-weight: 650; border-bottom: 1px solid var(--border-soft); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card .body { padding: 12px 14px; }
+  label.field { display: block; color: var(--muted); font-size: 11.5px; margin: 0 0 6px; }
+  select, textarea {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 9px; outline: none;
+  }
+  select:focus, textarea:focus { border-color: #4a5361; }
+  textarea { resize: vertical; min-height: 150px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; }
+  .row { display: grid; gap: 9px; }
+  .hint { margin: 8px 0 0; color: var(--dim); font-size: 11.5px; line-height: 1.45; }
+  .hint.err { color: var(--error); }
+  .hint.ok { color: var(--ok); }
+
+  .job-list { display: grid; gap: 6px; }
+  .job-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 8px;
+    background: var(--bg-input); cursor: pointer; text-align: left; color: var(--text);
+  }
+  .job-item:hover { border-color: #3b424e; }
+  .job-item.selected { border-color: rgba(242,166,90,0.55); background: var(--accent-soft); }
+  .job-item .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .job-item .meta { font-size: 10.5px; color: var(--dim); font-family: var(--mono); flex: none; }
+  .queue-note { color: var(--dim); font-size: 11.5px; margin: 0 0 9px; }
+  .queue-note strong { color: var(--accent); font-weight: 600; }
+
+  .log-body { max-height: 320px; overflow-y: auto; padding: 9px 12px; background: #0d0f12; font-family: var(--mono); font-size: 11px; line-height: 1.5; }
+  .log-line { display: flex; gap: 8px; padding: 1px 0; color: var(--muted); align-items: baseline; }
+  .log-line .t { color: #4f5763; white-space: nowrap; flex: none; width: 64px; }
+  .log-line .m { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .log-line.step { color: #78818e; }
+  .log-line.info { color: #b9c2ce; }
+  .log-line.warning { color: var(--warn); }
+  .log-line.error { color: var(--error); }
+  .log-line.stderr { color: #7e8794; }
+  .log-empty { color: var(--dim); font-size: 11.5px; padding: 4px 0; }
+
+  footer { color: var(--dim); font-size: 11px; text-align: center; padding: 0 20px 26px; line-height: 1.6; }
+  footer code { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark">B</div>
+    <div>
+      <h1>Blender Director</h1>
+      <p>preview em tempo real &middot; comandos do agente &middot; aprovação humana</p>
+    </div>
+    <span id="mode-badge" class="badge">conectando…</span>
+  </div>
+  <div class="conn">
+    <span id="conn-dot" class="dot"></span>
+    <span id="conn-text">conectando…</span>
+    <span id="server-meta" class="mono" style="color:var(--dim)"></span>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="stage-panel">
+    <div class="panel-head">
+      <div>
+        <h2 id="job-title">Nenhum job ainda</h2>
+        <p id="job-sub">Envie um scene-spec para começar. O preview é renderizado antes do render final.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <span id="state-pill" class="state-pill">—</span>
+        <select id="job-select" aria-label="Selecionar job" style="width:230px;padding:5px 8px;font-size:11.5px"></select>
+      </div>
+    </div>
+
+    <div class="timeline" id="timeline" aria-label="Etapas do job">
+      <div class="step"><span class="n">1</span>Plano</div>
+      <div class="step"><span class="n">2</span>Construção</div>
+      <div class="step"><span class="n">3</span>Preview</div>
+      <div class="step"><span class="n">4</span>Aprovação</div>
+      <div class="step"><span class="n">5</span>Final</div>
+      <div class="step"><span class="n">6</span>Concluído</div>
+    </div>
+    <div class="substep" id="substep"></div>
+    <div id="error-banner" class="error-banner" hidden></div>
+
+    <div class="images">
+      <div class="image-card">
+        <div class="image-head">
+          <span><strong>Preview</strong> <span class="tag" id="preview-tag">—</span></span>
+          <span id="preview-meta">aguardando</span>
+        </div>
+        <div class="image-body" id="preview-body">
+          <div class="empty" id="preview-empty">
+            Nenhum preview renderizado ainda.<br>
+            O preview sai em resolução baixa (padrão 640 px) antes da aprovação.
+          </div>
+          <img id="preview-img" alt="Preview do render" hidden>
+        </div>
+      </div>
+
+      <div class="image-card" id="final-card" hidden>
+        <div class="image-head">
+          <span><strong>Render final</strong> <span class="tag" id="final-tag">—</span></span>
+          <span id="final-meta"></span>
+        </div>
+        <div class="image-body final" id="final-body">
+          <img id="final-img" alt="Render final" hidden>
+          <div class="empty" id="final-empty">Depois da aprovação, o render final aparece aqui.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="approve" class="btn primary" disabled>Aprovar render final</button>
+      <button id="cmd-light" class="btn">+ Luz de preenchimento</button>
+      <button id="cmd-material" class="btn">Metal no 1º material</button>
+      <button id="cmd-camera" class="btn">Aproximar câmera</button>
+    </div>
+    <div class="flash" id="flash"></div>
+
+    <div class="metrics" id="metrics">
+      <div class="metric"><div class="k">Engine</div><div class="v">—</div></div>
+      <div class="metric"><div class="k">Preview</div><div class="v">—</div></div>
+      <div class="metric"><div class="k">Final</div><div class="v">—</div></div>
+      <div class="metric"><div class="k">Cena</div><div class="v">—</div></div>
+      <div class="metric"><div class="k">Device</div><div class="v">—</div></div>
+    </div>
+  </section>
+
+  <aside>
+    <section class="card">
+      <h2>Novo job</h2>
+      <div class="body row">
+        <div>
+          <label class="field" for="example-select">Exemplo</label>
+          <select id="example-select">
+            <option value="">(colar JSON manualmente)</option>
+            <option value="scene-simple">Cena simples — cubo e esfera</option>
+            <option value="scene-studio">Estúdio — cerâmica, metal e tecido</option>
+          </select>
+        </div>
+        <div>
+          <label class="field" for="spec-input">Scene-spec (schema v1)</label>
+          <textarea id="spec-input" spellcheck="false" placeholder="{ &quot;name&quot;: ... }"></textarea>
+        </div>
+        <button id="create" class="btn">Enviar scene-spec</button>
+        <p id="create-hint" class="hint">O job entra na fila e o preview começa na hora.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Fila e jobs</h2>
+      <div class="body">
+        <p class="queue-note" id="queue-note">Nenhum job na fila.</p>
+        <div class="job-list" id="job-list"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Log do job</h2>
+      <div class="log-body" id="log"><div class="log-empty">Sem eventos ainda.</div></div>
+    </section>
+  </aside>
+</main>
+
+<footer>
+  Servidor local em <code>127.0.0.1</code> &middot; API: <code>POST /jobs</code>,
+  <code>GET /state</code>, <code>GET /events</code>, <code>POST /jobs/:id/commands</code>,
+  <code>POST /jobs/:id/approve</code> &middot; nenhum asset externo é carregado nesta página.
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  const STAGES = ['plan', 'build', 'preview', 'approval', 'final', 'done'];
+  const STAGE_LABELS = {
+    plan: 'Plano',
+    build: 'Construção',
+    preview: 'Preview',
+    approval: 'Aprovação',
+    final: 'Final',
+    done: 'Concluído',
+  };
+  const STATE_LABELS = {
+    queued: 'na fila',
+    running: 'executando',
+    waiting: 'aguardando aprovação',
+    done: 'concluído',
+    error: 'erro',
+  };
+
+  const els = {
+    modeBadge: document.getElementById('mode-badge'),
+    connDot: document.getElementById('conn-dot'),
+    connText: document.getElementById('conn-text'),
+    serverMeta: document.getElementById('server-meta'),
+    jobTitle: document.getElementById('job-title'),
+    jobSub: document.getElementById('job-sub'),
+    statePill: document.getElementById('state-pill'),
+    jobSelect: document.getElementById('job-select'),
+    timeline: document.getElementById('timeline'),
+    substep: document.getElementById('substep'),
+    errorBanner: document.getElementById('error-banner'),
+    previewImg: document.getElementById('preview-img'),
+    previewEmpty: document.getElementById('preview-empty'),
+    previewMeta: document.getElementById('preview-meta'),
+    previewTag: document.getElementById('preview-tag'),
+    finalCard: document.getElementById('final-card'),
+    finalImg: document.getElementById('final-img'),
+    finalEmpty: document.getElementById('final-empty'),
+    finalMeta: document.getElementById('final-meta'),
+    finalTag: document.getElementById('final-tag'),
+    approve: document.getElementById('approve'),
+    cmdLight: document.getElementById('cmd-light'),
+    cmdMaterial: document.getElementById('cmd-material'),
+    cmdCamera: document.getElementById('cmd-camera'),
+    flash: document.getElementById('flash'),
+    metrics: document.getElementById('metrics'),
+    exampleSelect: document.getElementById('example-select'),
+    specInput: document.getElementById('spec-input'),
+    create: document.getElementById('create'),
+    createHint: document.getElementById('create-hint'),
+    queueNote: document.getElementById('queue-note'),
+    jobList: document.getElementById('job-list'),
+    log: document.getElementById('log'),
+  };
+
+  let snapshot = null;
+  let selectedId = null;
+  let source = null;
+  let flashTimer = null;
+  let creating = false;
+  let loadingExample = false;
+
+  // ---------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function formatSeconds(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+    if (value < 1) return `${Math.round(value * 1000)} ms`;
+    if (value < 60) return `${value.toFixed(value < 10 ? 1 : 0)} s`;
+    const minutes = Math.floor(value / 60);
+    const seconds = Math.round(value % 60);
+    return `${minutes} min ${seconds} s`;
+  }
+
+  function formatResolution(value) {
+    if (!Array.isArray(value) || value.length !== 2) return '—';
+    return `${value[0]}×${value[1]}`;
+  }
+
+  function timeOf(iso) {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('pt-BR', { hour12: false });
+  }
+
+  function showFlash(text, kind = '') {
+    els.flash.textContent = text;
+    els.flash.className = `flash ${kind}`.trim();
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      els.flash.textContent = '';
+      els.flash.className = 'flash';
+    }, 6000);
+  }
+
+  function selectedJob() {
+    if (!snapshot) return null;
+    const jobs = snapshot.jobs || [];
+    if (selectedId) {
+      const found = jobs.find((job) => job.id === selectedId);
+      if (found) return found;
+    }
+    const current = jobs.find((job) => job.id === snapshot.currentJobId);
+    if (current) {
+      selectedId = current.id;
+      return current;
+    }
+    if (jobs.length > 0) {
+      selectedId = jobs[0].id;
+      return jobs[0];
+    }
+    selectedId = null;
+    return null;
+  }
+
+  async function postJson(url, body) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch {
+      payload = {};
+    }
+    if (!response.ok) {
+      const details = Array.isArray(payload.details) ? `\n${payload.details.join('\n')}` : '';
+      throw new Error(`${payload.error || `HTTP ${response.status}`}${details}`);
+    }
+    return payload;
+  }
+
+  function setImage(img, key, url) {
+    if (img.dataset.key === key) return;
+    img.dataset.key = key;
+    img.src = url;
+    img.hidden = false;
+  }
+
+  function clearImage(img) {
+    img.hidden = true;
+    img.removeAttribute('src');
+    img.dataset.key = '';
+  }
+
+  // ---------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------
+
+  function renderConnection() {
+    if (!snapshot) return;
+    els.modeBadge.textContent = snapshot.fakeBlender ? 'modo fixture (sem Blender)' : 'Blender real';
+    els.modeBadge.className = `badge ${snapshot.fakeBlender ? 'fixture' : 'real'}`;
+    els.serverMeta.textContent = `v${snapshot.version} · ${snapshot.renderer || ''}`;
+  }
+
+  function renderJobSelect(job) {
+    const jobs = snapshot ? snapshot.jobs || [] : [];
+    const desired = jobs.map((item) => item.id).join(',');
+    if (els.jobSelect.dataset.ids !== desired) {
+      els.jobSelect.dataset.ids = desired;
+      els.jobSelect.innerHTML = jobs.length === 0
+        ? '<option value="">nenhum job</option>'
+        : jobs.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+    }
+    if (job) els.jobSelect.value = job.id;
+  }
+
+  function renderTimeline(job) {
+    const currentIndex = job && job.state !== 'error' ? STAGES.indexOf(job.stage) : -1;
+    const done = Boolean(job && job.stage === 'done');
+    const steps = STAGES.map((stage, index) => {
+      const classes = ['step'];
+      if (done || (currentIndex >= 0 && index < currentIndex)) classes.push('complete');
+      if (currentIndex >= 0 && index === currentIndex && !done) classes.push('active');
+      if (job && job.state === 'error') classes.push('error');
+      const marker = done || (currentIndex >= 0 && index < currentIndex) ? '✓' : String(index + 1);
+      return `<div class="${classes.join(' ')}"><span class="n">${marker}</span>${STAGE_LABELS[stage]}</div>`;
+    });
+    els.timeline.innerHTML = steps.join('');
+  }
+
+  function renderMetrics(job) {
+    const summary = job.summary || {};
+    const preview = (job.metrics && job.metrics.preview) || null;
+    const final = (job.metrics && job.metrics.final) || null;
+    const previewMain = preview ? formatResolution(preview.resolution) : '—';
+    const previewSub = preview ? `${preview.samples} spp · ${formatSeconds(preview.seconds)}` : '';
+    const finalMain = final ? formatResolution(final.resolution) : '—';
+    const finalSub = final ? `${final.samples} spp · ${formatSeconds(final.seconds)}` : '';
+    const deviceText = (final && final.device) || (preview && preview.device) || '—';
+    const materialCount = (summary.materials || []).length;
+    els.metrics.innerHTML = `
+      <div class="metric"><div class="k">Engine</div><div class="v">${escapeHtml(summary.engine || '—')}</div><div class="sub">${summary.samples || '—'} spp final</div></div>
+      <div class="metric"><div class="k">Preview</div><div class="v">${previewMain}</div><div class="sub">${previewSub}</div></div>
+      <div class="metric"><div class="k">Final</div><div class="v">${finalMain}</div><div class="sub">${finalSub}</div></div>
+      <div class="metric"><div class="k">Cena</div><div class="v">${summary.objects ?? '—'} obj · ${summary.lights ?? '—'} luzes</div><div class="sub">${materialCount} materiais</div></div>
+      <div class="metric"><div class="k">Device</div><div class="v">${escapeHtml(deviceText)}</div><div class="sub">${escapeHtml(preview && preview.engine ? preview.engine : '')}</div></div>
+    `;
+  }
+
+  function renderPreview(job) {
+    const previews = job.previews || [];
+    const latest = previews[previews.length - 1];
+    if (!latest) {
+      clearImage(els.previewImg);
+      els.previewEmpty.hidden = false;
+      els.previewMeta.textContent = job.state === 'error' ? 'falhou' : 'aguardando';
+      els.previewTag.textContent = '—';
+      if (job.stage === 'build' || job.stage === 'preview') {
+        els.previewEmpty.innerHTML = '<div class="spinner"></div>Construindo a cena e renderizando o preview…';
+      } else {
+        els.previewEmpty.innerHTML = 'Nenhum preview renderizado ainda.<br>O preview sai em resolução baixa (padrão 640 px) antes da aprovação.';
+      }
+      return;
+    }
+    const cacheKey = `${job.id}:${latest.n}:${latest.at || ''}`;
+    els.previewEmpty.hidden = true;
+    setImage(els.previewImg, cacheKey, `${latest.url}?v=${encodeURIComponent(cacheKey)}`);
+    els.previewMeta.textContent = `${latest.width || '?'}×${latest.height || '?'} · ${latest.samples || '?'} spp · ${formatSeconds(latest.seconds)}`;
+    els.previewTag.textContent = `preview #${latest.n}`;
+
+    const final = job.final;
+    els.finalCard.hidden = !final;
+    if (!final) {
+      clearImage(els.finalImg);
+      els.finalEmpty.hidden = false;
+      els.finalMeta.textContent = '';
+      els.finalTag.textContent = '—';
+      return;
+    }
+    els.finalEmpty.hidden = true;
+    const extension = (final.file.split('.').pop() || '').toLowerCase();
+    if (extension === 'exr') {
+      clearImage(els.finalImg);
+      els.finalEmpty.hidden = false;
+      els.finalEmpty.innerHTML = `Render final em EXR.<br><a href="${escapeHtml(final.url)}" style="color:var(--accent)">Baixar ${escapeHtml(final.file)}</a>`;
+    } else {
+      const finalKey = `${job.id}:final:${final.at || ''}`;
+      setImage(els.finalImg, finalKey, `${final.url}?v=${encodeURIComponent(finalKey)}`);
+    }
+    els.finalMeta.textContent = `${final.width || '?'}×${final.height || '?'} · ${final.samples || '?'} spp · ${formatSeconds(final.seconds)}`;
+    els.finalTag.textContent = final.file;
+  }
+
+  function renderLog(job) {
+    const logs = (job.logs || []).slice(-120);
+    if (logs.length === 0) {
+      els.log.innerHTML = '<div class="log-empty">Sem eventos ainda.</div>';
+      return;
+    }
+    const nearBottom = els.log.scrollHeight - els.log.scrollTop - els.log.clientHeight < 60;
+    els.log.innerHTML = logs.map((entry) => `
+      <div class="log-line ${escapeHtml(entry.level)}">
+        <span class="t">${escapeHtml(timeOf(entry.at))}</span>
+        <span class="m" title="${escapeHtml(entry.message)}">${escapeHtml(entry.message)}</span>
+      </div>
+    `).join('');
+    if (nearBottom) els.log.scrollTop = els.log.scrollHeight;
+  }
+
+  function renderJobList() {
+    const jobs = snapshot ? snapshot.jobs || [] : [];
+    const queue = snapshot ? snapshot.queue || [] : [];
+    const current = selectedJob();
+    if (queue.length > 0) {
+      els.queueNote.innerHTML = `<strong>${queue.length}</strong> job(s) na fila: ${queue.map((item) => escapeHtml(item.name)).join(' · ')}`;
+    } else {
+      els.queueNote.textContent = jobs.length === 0 ? 'Nenhum job criado ainda.' : 'Nenhum job na fila.';
+    }
+    if (jobs.length === 0) {
+      els.jobList.innerHTML = '<div class="hint">Envie o primeiro scene-spec ao lado.</div>';
+      return;
+    }
+    els.jobList.innerHTML = jobs.map((job) => `
+      <button class="job-item ${current && current.id === job.id ? 'selected' : ''}" data-job-id="${escapeHtml(job.id)}">
+        <span class="name">${escapeHtml(job.name)}</span>
+        <span class="meta">${escapeHtml(job.state)} · ${escapeHtml(job.stage)}</span>
+      </button>
+    `).join('');
+  }
+
+  function renderActions(job) {
+    const waiting = Boolean(job && job.state === 'waiting' && job.stage === 'approval');
+    const runningFinal = Boolean(job && job.stage === 'final' && job.state === 'running');
+    const done = Boolean(job && job.state === 'done');
+    els.approve.disabled = !waiting;
+    els.approve.textContent = runningFinal ? 'Renderizando final…' : done ? 'Render final concluído' : 'Aprovar render final';
+    const materials = (job && job.summary && job.summary.materials) || [];
+    els.cmdLight.disabled = !waiting;
+    els.cmdMaterial.disabled = !waiting || materials.length === 0;
+    els.cmdCamera.disabled = !waiting;
+    els.cmdMaterial.textContent = materials.length > 0 ? `Metal em “${materials[0]}”` : 'Metal no 1º material';
+  }
+
+  function render() {
+    if (!snapshot) return;
+    renderConnection();
+    const job = selectedJob();
+    renderJobSelect(job);
+    renderTimeline(job);
+    renderJobList();
+    renderActions(job);
+
+    if (!job) {
+      els.jobTitle.textContent = 'Nenhum job ainda';
+      els.jobSub.textContent = 'Envie um scene-spec para começar. O preview é renderizado antes do render final.';
+      els.statePill.textContent = '—';
+      els.statePill.className = 'state-pill';
+      els.substep.textContent = '';
+      els.errorBanner.hidden = true;
+      clearImage(els.previewImg);
+      els.previewEmpty.hidden = false;
+      els.finalCard.hidden = true;
+      els.metrics.innerHTML = '';
+      els.log.innerHTML = '<div class="log-empty">Sem eventos ainda.</div>';
+      return;
+    }
+
+    const summary = job.summary || {};
+    els.jobTitle.textContent = job.name;
+    els.jobSub.textContent = [
+      `${summary.objects ?? '?'} objetos`,
+      `${summary.lights ?? '?'} luzes`,
+      `${(summary.materials || []).length} materiais`,
+      summary.engine || '',
+      summary.samples ? `${summary.samples} spp final` : '',
+    ].filter(Boolean).join(' · ');
+    els.statePill.textContent = STATE_LABELS[job.state] || job.state;
+    els.statePill.className = `state-pill ${job.state}`;
+
+    const stageIndex = STAGES.indexOf(job.stage);
+    const detail = job.state === 'error'
+      ? 'Interrompido'
+      : job.stage === 'done'
+        ? 'Fluxo concluído'
+        : `Etapa ${stageIndex + 1} de ${STAGES.length}: ${STAGE_LABELS[job.stage] || job.stage}`;
+    els.substep.innerHTML = `${escapeHtml(detail)}${job.substep ? ` · <span class="mono">${escapeHtml(job.substep)}</span>` : ''}`;
+
+    els.errorBanner.hidden = !job.error;
+    if (job.error) els.errorBanner.textContent = `Erro: ${job.error}`;
+
+    renderPreview(job);
+    renderMetrics(job);
+    renderLog(job);
+  }
+
+  function applyState(next) {
+    snapshot = next;
+    render();
+  }
+
+  // ---------------------------------------------------------------------
+  // SSE e carga inicial
+  // ---------------------------------------------------------------------
+
+  function connect() {
+    if (source) source.close();
+    source = new EventSource('/events');
+    source.onopen = () => {
+      els.connDot.className = 'dot on';
+      els.connText.textContent = 'tempo real conectado';
+    };
+    source.onerror = () => {
+      els.connDot.className = 'dot off';
+      els.connText.textContent = 'reconectando…';
+    };
+    source.onmessage = (message) => {
+      try {
+        const payload = JSON.parse(message.data);
+        if (payload.type === 'state' && payload.state) applyState(payload.state);
+      } catch {
+        // ignora mensagens de heartbeat/ruído
+      }
+    };
+  }
+
+  async function loadState() {
+    const response = await fetch('/state', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`GET /state falhou: ${response.status}`);
+    applyState(await response.json());
+  }
+
+  async function loadExample(name) {
+    if (!name || loadingExample) return;
+    loadingExample = true;
+    try {
+      const response = await fetch(`/examples/${name}.json`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`exemplo indisponível: ${response.status}`);
+      els.specInput.value = JSON.stringify(await response.json(), null, 2);
+      els.createHint.className = 'hint';
+      els.createHint.textContent = `Exemplo “${name}” carregado. Revise e envie.`;
+    } catch (error) {
+      els.createHint.className = 'hint err';
+      els.createHint.textContent = error.message;
+    } finally {
+      loadingExample = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Interações
+  // ---------------------------------------------------------------------
+
+  els.exampleSelect.addEventListener('change', () => {
+    loadExample(els.exampleSelect.value);
+  });
+
+  els.create.addEventListener('click', async () => {
+    if (creating) return;
+    let spec;
+    try {
+      spec = JSON.parse(els.specInput.value);
+    } catch (error) {
+      els.createHint.className = 'hint err';
+      els.createHint.textContent = `JSON inválido: ${error.message}`;
+      return;
+    }
+    creating = true;
+    els.create.disabled = true;
+    els.createHint.className = 'hint';
+    els.createHint.textContent = 'Enviando…';
+    try {
+      const payload = await postJson('/jobs', spec);
+      selectedId = payload.id;
+      els.createHint.className = 'hint ok';
+      els.createHint.textContent = `Job ${payload.id} criado (${payload.state}). O preview começa em seguida.`;
+      await loadState();
+    } catch (error) {
+      els.createHint.className = 'hint err';
+      els.createHint.textContent = error.message;
+    } finally {
+      creating = false;
+      els.create.disabled = false;
+    }
+  });
+
+  els.jobSelect.addEventListener('change', () => {
+    selectedId = els.jobSelect.value || null;
+    render();
+  });
+
+  els.jobList.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-job-id]');
+    if (!button) return;
+    selectedId = button.dataset.jobId;
+    render();
+  });
+
+  els.approve.addEventListener('click', async () => {
+    const job = selectedJob();
+    if (!job) return;
+    els.approve.disabled = true;
+    try {
+      await postJson(`/jobs/${job.id}/approve`, {});
+      showFlash('Aprovação enviada: render final em andamento.', 'ok');
+    } catch (error) {
+      showFlash(error.message, 'err');
+      render();
+    }
+  });
+
+  async function sendCommand(body, label) {
+    const job = selectedJob();
+    if (!job) return;
+    try {
+      await postJson(`/jobs/${job.id}/commands`, body);
+      showFlash(`${label} aplicado; gerando novo preview.`, 'ok');
+    } catch (error) {
+      showFlash(error.message, 'err');
+      render();
+    }
+  }
+
+  els.cmdLight.addEventListener('click', () => {
+    sendCommand({
+      op: 'add_light',
+      name: `preenchimento_${Date.now().toString(36)}`,
+      type: 'AREA',
+      position: [-2.6, 2.8, 3.0],
+      energy: 220,
+      size: 1.4,
+      color: '#bcd6ff',
+      target: [0, 0, 0.9],
+    }, 'Luz de preenchimento');
+  });
+
+  els.cmdMaterial.addEventListener('click', () => {
+    const job = selectedJob();
+    const materials = (job && job.summary && job.summary.materials) || [];
+    if (materials.length === 0) return;
+    sendCommand({
+      op: 'set_material',
+      name: materials[0],
+      metallic: 0.85,
+      roughness: 0.22,
+    }, `Material “${materials[0]}”`);
+  });
+
+  els.cmdCamera.addEventListener('click', () => {
+    const job = selectedJob();
+    const camera = (job && job.summary && job.summary.camera) || null;
+    if (!camera) return;
+    const location = Array.isArray(camera.location) ? camera.location.slice() : [4.5, -4.5, 2.8];
+    const target = Array.isArray(camera.target) ? camera.target : [0, 0, 0.9];
+    const next = location.map((value, index) => Number((value + (target[index] - value) * 0.18).toFixed(3)));
+    const command = { op: 'move_camera', location: next };
+    if (Array.isArray(camera.target)) command.target = camera.target;
+    sendCommand(command, 'Aproximação da câmera');
+  });
+
+  // ---------------------------------------------------------------------
+  // Inicialização
+  // ---------------------------------------------------------------------
+
+  (async () => {
+    try {
+      await loadState();
+      connect();
+      if (!els.specInput.value.trim()) await loadExample('scene-simple');
+    } catch (error) {
+      els.connDot.className = 'dot off';
+      els.connText.textContent = 'servidor indisponível';
+      showFlash(`Não foi possível carregar o estado: ${error.message}`, 'err');
+    }
+  })();
+})();
+</script>
+</body>
+</html>

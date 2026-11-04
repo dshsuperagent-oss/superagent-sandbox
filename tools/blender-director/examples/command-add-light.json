@@ -1,0 +1,10 @@
+{
+  "op": "add_light",
+  "name": "contra",
+  "type": "AREA",
+  "position": [-2.4, 2.8, 3.2],
+  "energy": 260,
+  "size": 1.2,
+  "color": "#9fc4ff",
+  "target": [0, 0, 0.9]
+}
