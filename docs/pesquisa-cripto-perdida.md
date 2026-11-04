@@ -261,6 +261,7 @@ O monitor não é uma ferramenta de recuperação. Ele não promete achar nada, 
 
 **Verificado em fonte primária (04/11/2026):**
 
+- os saldos e as contagens de transações foram lidos via `blockstream.info` (API Esplora) e conferidos na `mempool.space`; os endereços vieram da transação pública de 2015;
 - a transação de 2015 tem 256 saídas P2PKH, de 0,001 a 0,256 BTC, e os 160 endereços de `addresses.json` batem com as 160 primeiras saídas (0 divergências);
 - o endereço #71 tem 7,10195986 BTC, 72 transações e zero saídas gastas; os endereços #64 a #70 estão zerados;
 - o snapshot dos 160 endereços soma 903,01685753 BTC, com 77 endereços ainda com saldo e 83 zerados;
