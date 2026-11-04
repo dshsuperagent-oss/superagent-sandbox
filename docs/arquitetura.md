@@ -138,10 +138,10 @@ as conexões.
 
 ### `requestAnimationFrame` e leitura de layout
 
-`pointermove` apenas registra a última posição e marca uma flag
-(`pending.drag`, `pending.link`, `pending.view`). `requestFrame()` agenda um
-único `requestAnimationFrame`; `flushFrame()` aplica as escritas. Vários eventos
-no mesmo frame viram uma atualização só.
+`pointermove` não escreve no DOM: atualiza a matemática da câmera/posição
+pendente e marca uma flag (`pending.drag`, `pending.link`, `pending.view`).
+`requestFrame()` agenda um único `requestAnimationFrame`; `flushFrame()` aplica
+as escritas. Vários eventos no mesmo frame viram uma atualização só.
 
 A posição do SVG é lida uma vez por gesto com `stageRect()` e guardada em
 `rectCache`; `invalidateRect()` é chamado em resize e ao abrir/fechar o painel.
