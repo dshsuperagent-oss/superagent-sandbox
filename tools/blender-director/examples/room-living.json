@@ -1,0 +1,1758 @@
+{
+  "schemaVersion": 1,
+  "name": "Sala de estar — apartamento com janela central",
+  "description": "Sala medida a partir da foto de referência referencia/living-room.png (1280x854). Paredes brancas, piso acarpetado cinza, sofá de veludo caramelo à esquerda, painel de madeira com TV à direita, mesa de centro escura e janela/porta de sacada central com cortinas. Blocos de mobiliário + assets livres (planta, quadro, luminária).",
+  "room": {
+    "interior": {
+      "width": 3.6,
+      "depth": 4.8,
+      "height": 2.75
+    },
+    "wallThickness": 0.12,
+    "floor": {
+      "material": "carpete",
+      "thickness": 0.1
+    },
+    "ceiling": {
+      "material": "teto",
+      "thickness": 0.1
+    },
+    "openings": {
+      "frame": {
+        "profile": 0.06,
+        "depth": 0.1,
+        "mullions": 1,
+        "transom": 0.35
+      },
+      "frameMaterial": "esquadria",
+      "glassMaterial": "vidro",
+      "glass": true
+    },
+    "walls": [
+      {
+        "side": "north",
+        "material": "parede",
+        "openings": [
+          {
+            "id": "janela-sala",
+            "type": "window",
+            "u": 1.15,
+            "bottom": 0.05,
+            "width": 1.3,
+            "height": 2.2,
+            "frame": {
+              "profile": 0.06,
+              "depth": 0.1,
+              "mullions": 1,
+              "transom": 0.35
+            },
+            "glass": true
+          }
+        ]
+      },
+      {
+        "side": "south",
+        "material": "parede",
+        "openings": []
+      },
+      {
+        "side": "east",
+        "material": "parede",
+        "openings": []
+      },
+      {
+        "side": "west",
+        "material": "parede",
+        "openings": []
+      }
+    ]
+  },
+  "exterior": {
+    "balcony": {
+      "enabled": true,
+      "depth": 1.2,
+      "railingHeight": 1.05,
+      "bars": 13,
+      "material": "metal"
+    },
+    "backdrop": {
+      "enabled": true,
+      "facade": {
+        "material": "predio",
+        "distance": 7.0,
+        "width": 18,
+        "height": 4.5
+      },
+      "hedge": {
+        "material": "vegetacao",
+        "width": 3.4,
+        "height": 1.15,
+        "depth": 0.8,
+        "offset": 0.5
+      }
+    }
+  },
+  "materials": {
+    "carpete": {
+      "baseColor": "#5a5854",
+      "roughness": 0.96,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 180,
+          "detail": 8,
+          "roughness": 0.72,
+          "color1": "#3a3937",
+          "color2": "#5c5955"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.3,
+        "scale": 200
+      }
+    },
+    "parede": {
+      "baseColor": "#b8b0a4",
+      "roughness": 0.9,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 32,
+          "detail": 4,
+          "roughness": 0.65,
+          "color1": "#e2dcd2",
+          "color2": "#eee9e1"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.04,
+        "scale": 60
+      }
+    },
+    "parede-madeira": {
+      "baseColor": "#5a4330",
+      "roughness": 0.55,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 28,
+          "detail": 6,
+          "roughness": 0.62,
+          "color1": "#6a4b33",
+          "color2": "#8a6647"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.08,
+        "scale": 40
+      }
+    },
+    "teto": {
+      "baseColor": "#d0c8bc",
+      "roughness": 0.95
+    },
+    "esquadria": {
+      "baseColor": "#2b2c2e",
+      "metallic": 0.65,
+      "roughness": 0.38
+    },
+    "vidro": {
+      "baseColor": "#ffffff",
+      "roughness": 0.03,
+      "ior": 1.5,
+      "transmission": 1.0
+    },
+    "sofa": {
+      "baseColor": "#5f330e",
+      "roughness": 0.82,
+      "sheen": 0.5,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 90,
+          "detail": 5,
+          "roughness": 0.6,
+          "color1": "#96683f",
+          "color2": "#b98553"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.12,
+        "scale": 120
+      }
+    },
+    "sofa-almofada": {
+      "baseColor": "#6e3d14",
+      "roughness": 0.86,
+      "sheen": 0.6,
+      "normal": {
+        "type": "bump",
+        "strength": 0.1,
+        "scale": 140
+      }
+    },
+    "cortina": {
+      "baseColor": "#2f332e",
+      "roughness": 0.94,
+      "sheen": 0.35,
+      "normal": {
+        "type": "bump",
+        "strength": 0.05,
+        "scale": 80
+      }
+    },
+    "madeira-escura": {
+      "baseColor": "#241a12",
+      "roughness": 0.38,
+      "coat": 0.2,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 40,
+          "detail": 6,
+          "roughness": 0.6,
+          "color1": "#261a12",
+          "color2": "#463123"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.06,
+        "scale": 50
+      }
+    },
+    "madeira-media": {
+      "baseColor": "#6b5238",
+      "roughness": 0.52,
+      "textures": [
+        {
+          "type": "wave",
+          "scale": 14,
+          "distortion": 4,
+          "color1": "#7a5a3e",
+          "color2": "#a07c5c"
+        }
+      ]
+    },
+    "branco-brilhante": {
+      "baseColor": "#e9e5dd",
+      "roughness": 0.42,
+      "coat": 0.25
+    },
+    "preto-tv": {
+      "baseColor": "#050506",
+      "metallic": 0.25,
+      "roughness": 0.28
+    },
+    "metal": {
+      "baseColor": "#8b8d90",
+      "metallic": 1.0,
+      "roughness": 0.34
+    },
+    "luminaria-shade": {
+      "baseColor": "#f3dcc0",
+      "roughness": 0.6,
+      "emission": {
+        "color": "#ffd9a8",
+        "strength": 2.2
+      }
+    },
+    "ceramica": {
+      "baseColor": "#d8d2c6",
+      "roughness": 0.35,
+      "coat": 0.3
+    },
+    "predio": {
+      "baseColor": "#d8dde3",
+      "roughness": 0.95,
+      "textures": [
+        {
+          "type": "checker",
+          "scale": 30,
+          "color1": "#c3cad2",
+          "color2": "#dfe4ea"
+        }
+      ],
+      "emission": {
+        "color": "#c9d2dc",
+        "strength": 0.5
+      }
+    },
+    "vegetacao": {
+      "baseColor": "#3a5428",
+      "roughness": 0.9,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 60,
+          "detail": 8,
+          "roughness": 0.7,
+          "color1": "#2f4722",
+          "color2": "#5b7a3d"
+        }
+      ],
+      "normal": {
+        "type": "bump",
+        "strength": 0.15,
+        "scale": 90
+      }
+    }
+  },
+  "furniture": [
+    {
+      "id": "sofa-base",
+      "shape": "roundbox",
+      "size": [
+        0.9,
+        2.2,
+        0.35
+      ],
+      "position": [
+        1.217142857142857,
+        -0.3,
+        0.12
+      ],
+      "material": "sofa",
+      "bevel": 0.05,
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "collisionGroup": "sofa",
+      "support": "floor"
+    },
+    {
+      "id": "sofa-assento",
+      "shape": "roundbox",
+      "size": [
+        0.8,
+        2.1,
+        0.18
+      ],
+      "position": [
+        1.1742857142857144,
+        -0.3,
+        0.47
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.06,
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "sofa-encosto",
+      "shape": "roundbox",
+      "size": [
+        0.24,
+        2.2,
+        0.72
+      ],
+      "position": [
+        1.5342857142857143,
+        -0.3,
+        0.47
+      ],
+      "material": "sofa",
+      "bevel": 0.07,
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "sofa-braco-norte",
+      "shape": "roundbox",
+      "size": [
+        0.85,
+        0.2,
+        0.58
+      ],
+      "position": [
+        1.217142857142857,
+        -1.37,
+        0.12
+      ],
+      "material": "sofa",
+      "bevel": 0.06,
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "sofa-braco-sul",
+      "shape": "roundbox",
+      "size": [
+        0.85,
+        0.2,
+        0.58
+      ],
+      "position": [
+        1.217142857142857,
+        0.77,
+        0.12
+      ],
+      "material": "sofa",
+      "bevel": 0.06,
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "almofada-norte",
+      "shape": "roundbox",
+      "size": [
+        0.26,
+        0.58,
+        0.5
+      ],
+      "position": [
+        1.3714285714285714,
+        -0.7,
+        0.65
+      ],
+      "rotation": [
+        0,
+        0,
+        -6
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.07,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "almofada-sul",
+      "shape": "roundbox",
+      "size": [
+        0.26,
+        0.58,
+        0.5
+      ],
+      "position": [
+        1.3714285714285714,
+        0.4,
+        0.65
+      ],
+      "rotation": [
+        0,
+        0,
+        5
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.07,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "mesa-centro-tampo",
+      "shape": "roundbox",
+      "size": [
+        1.2,
+        0.8,
+        0.07
+      ],
+      "position": [
+        -0.05,
+        -0.2,
+        0.4
+      ],
+      "material": "madeira-escura",
+      "bevel": 0.01,
+      "smooth": false,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "mesa-centro-pe-1",
+      "shape": "box",
+      "size": [
+        0.07,
+        0.07,
+        0.4
+      ],
+      "position": [
+        -0.52,
+        -0.54,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "floor",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "mesa-centro-pe-2",
+      "shape": "box",
+      "size": [
+        0.07,
+        0.07,
+        0.4
+      ],
+      "position": [
+        0.52,
+        -0.54,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "floor",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "mesa-centro-pe-3",
+      "shape": "box",
+      "size": [
+        0.07,
+        0.07,
+        0.4
+      ],
+      "position": [
+        -0.52,
+        0.14,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "floor",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "mesa-centro-pe-4",
+      "shape": "box",
+      "size": [
+        0.07,
+        0.07,
+        0.4
+      ],
+      "position": [
+        0.52,
+        0.14,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "floor",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "livro-1",
+      "shape": "box",
+      "size": [
+        0.3,
+        0.21,
+        0.035
+      ],
+      "position": [
+        0.2,
+        -0.27,
+        0.47
+      ],
+      "rotation": [
+        0,
+        0,
+        7
+      ],
+      "material": "madeira-escura",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "livro-2",
+      "shape": "box",
+      "size": [
+        0.27,
+        0.19,
+        0.03
+      ],
+      "position": [
+        0.18,
+        -0.26,
+        0.505
+      ],
+      "rotation": [
+        0,
+        0,
+        -4
+      ],
+      "material": "branco-brilhante",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "xicara-1",
+      "shape": "cylinder",
+      "size": [
+        0.085,
+        0.085,
+        0.09
+      ],
+      "position": [
+        -0.3,
+        -0.3,
+        0.47
+      ],
+      "material": "ceramica",
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "xicara-2",
+      "shape": "cylinder",
+      "size": [
+        0.085,
+        0.085,
+        0.09
+      ],
+      "position": [
+        -0.42,
+        -0.05,
+        0.47
+      ],
+      "material": "ceramica",
+      "smooth": true,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "painel-madeira",
+      "shape": "box",
+      "size": [
+        0.02,
+        3.2,
+        1.5
+      ],
+      "position": [
+        -1.79,
+        -0.1,
+        0.45
+      ],
+      "material": "parede-madeira",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "wall"
+    },
+    {
+      "id": "rack-base",
+      "shape": "roundbox",
+      "size": [
+        0.45,
+        2.6,
+        0.52
+      ],
+      "position": [
+        -1.57,
+        -0.1,
+        0.0
+      ],
+      "material": "madeira-media",
+      "bevel": 0.015,
+      "smooth": false,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "floor",
+      "collisionGroup": "rack"
+    },
+    {
+      "id": "rack-gavetas",
+      "shape": "box",
+      "size": [
+        0.03,
+        2.5,
+        0.34
+      ],
+      "position": [
+        -1.345,
+        -0.1,
+        0.06
+      ],
+      "material": "branco-brilhante",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "wall",
+      "collisionGroup": "rack"
+    },
+    {
+      "id": "tv",
+      "shape": "box",
+      "size": [
+        0.07,
+        1.35,
+        0.78
+      ],
+      "position": [
+        -1.74,
+        -0.3,
+        0.93
+      ],
+      "material": "preto-tv",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "wall"
+    },
+    {
+      "id": "prateleira-1",
+      "shape": "box",
+      "size": [
+        0.26,
+        0.8,
+        0.04
+      ],
+      "position": [
+        -1.61,
+        -1.3,
+        1.9
+      ],
+      "material": "madeira-media",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "wall",
+      "collisionGroup": "prateleira"
+    },
+    {
+      "id": "prateleira-2",
+      "shape": "box",
+      "size": [
+        0.26,
+        0.8,
+        0.04
+      ],
+      "position": [
+        -1.61,
+        -1.3,
+        2.18
+      ],
+      "material": "madeira-media",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "wall",
+      "collisionGroup": "prateleira"
+    },
+    {
+      "id": "sanca-janela",
+      "shape": "box",
+      "size": [
+        3.6,
+        0.55,
+        0.33
+      ],
+      "position": [
+        0.0,
+        -2.125,
+        2.42
+      ],
+      "material": "parede",
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "support": "ceiling",
+      "collisionGroup": "sanca"
+    },
+    {
+      "id": "cortina-e-1",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.12,
+        2.3
+      ],
+      "position": [
+        0.7999999999999999,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "cortina-e-2",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.2,
+        2.3
+      ],
+      "position": [
+        0.95,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "cortina-e-3",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.12,
+        2.3
+      ],
+      "position": [
+        1.0999999999999999,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "cortina-d-1",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.12,
+        2.3
+      ],
+      "position": [
+        -0.7999999999999999,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "cortina-d-2",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.2,
+        2.3
+      ],
+      "position": [
+        -0.95,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "cortina-d-3",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.12,
+        2.3
+      ],
+      "position": [
+        -1.0999999999999999,
+        -2.27,
+        0.1
+      ],
+      "material": "cortina",
+      "bevel": 0.02,
+      "smooth": true,
+      "support": "wall",
+      "collisionGroup": "cortina"
+    },
+    {
+      "id": "assento-1",
+      "shape": "roundbox",
+      "size": [
+        0.75,
+        0.96,
+        0.11
+      ],
+      "position": [
+        1.1742857142857144,
+        -0.7,
+        0.65
+      ],
+      "rotation": [
+        0,
+        0,
+        1.5
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.03,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "assento-2",
+      "shape": "roundbox",
+      "size": [
+        0.78,
+        0.96,
+        0.11
+      ],
+      "position": [
+        1.1742857142857144,
+        0.3,
+        0.65
+      ],
+      "rotation": [
+        0,
+        0,
+        -1.0
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.03,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "encosto-1",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.7,
+        0.5
+      ],
+      "position": [
+        1.44,
+        -0.92,
+        0.65
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.05,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "encosto-2",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.7,
+        0.5
+      ],
+      "position": [
+        1.44,
+        -0.14,
+        0.65
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.05,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "encosto-3",
+      "shape": "roundbox",
+      "size": [
+        0.18,
+        0.7,
+        0.5
+      ],
+      "position": [
+        1.44,
+        0.64,
+        0.65
+      ],
+      "material": "sofa-almofada",
+      "bevel": 0.05,
+      "smooth": true,
+      "collisionGroup": "sofa",
+      "support": "furniture"
+    },
+    {
+      "id": "ripa-01",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -1.4,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-02",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -1.2,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-03",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -0.9999999999999999,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-04",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -0.7999999999999998,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-05",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -0.5999999999999999,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-06",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -0.3999999999999999,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-07",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        -0.19999999999999973,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-08",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        2.220446049250313e-16,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-09",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        0.20000000000000018,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-10",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        0.40000000000000013,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-11",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        0.6000000000000001,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-12",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        0.8000000000000003,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-13",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        1.0000000000000004,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "ripa-14",
+      "shape": "roundbox",
+      "size": [
+        0.03,
+        0.19,
+        1.48
+      ],
+      "position": [
+        -1.748,
+        1.2000000000000002,
+        0.46
+      ],
+      "material": "madeira-media",
+      "bevel": 0.006,
+      "smooth": false,
+      "support": "wall",
+      "detail": true
+    },
+    {
+      "id": "rodape-sul",
+      "shape": "box",
+      "size": [
+        3.6,
+        0.02,
+        0.1
+      ],
+      "position": [
+        0.0,
+        2.39,
+        0.0
+      ],
+      "material": "branco-brilhante",
+      "detail": true,
+      "support": "wall"
+    },
+    {
+      "id": "rodape-leste",
+      "shape": "box",
+      "size": [
+        0.02,
+        4.8,
+        0.1
+      ],
+      "position": [
+        1.79,
+        0.0,
+        0.0
+      ],
+      "material": "branco-brilhante",
+      "detail": true,
+      "support": "wall"
+    },
+    {
+      "id": "rodape-oeste",
+      "shape": "box",
+      "size": [
+        0.02,
+        4.8,
+        0.1
+      ],
+      "position": [
+        -1.79,
+        0.0,
+        0.0
+      ],
+      "material": "branco-brilhante",
+      "detail": true,
+      "support": "wall"
+    },
+    {
+      "id": "livro-prateleira-1",
+      "shape": "box",
+      "size": [
+        0.15,
+        0.06,
+        0.24
+      ],
+      "position": [
+        -1.61,
+        -1.62,
+        1.94
+      ],
+      "material": "madeira-escura",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "livro-prateleira-2",
+      "shape": "box",
+      "size": [
+        0.15,
+        0.06,
+        0.24
+      ],
+      "position": [
+        -1.61,
+        -1.54,
+        1.94
+      ],
+      "material": "branco-brilhante",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "livro-prateleira-3",
+      "shape": "box",
+      "size": [
+        0.15,
+        0.06,
+        0.24
+      ],
+      "position": [
+        -1.61,
+        -1.46,
+        1.94
+      ],
+      "material": "ceramica",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "livro-prateleira-4",
+      "shape": "box",
+      "size": [
+        0.15,
+        0.06,
+        0.24
+      ],
+      "position": [
+        -1.61,
+        -1.33,
+        1.94
+      ],
+      "material": "madeira-media",
+      "support": "furniture",
+      "collisionGroup": "mesa"
+    },
+    {
+      "id": "vaso-prateleira",
+      "shape": "cylinder",
+      "size": [
+        0.11,
+        0.11,
+        0.22
+      ],
+      "position": [
+        -1.61,
+        -1.15,
+        1.94
+      ],
+      "material": "ceramica",
+      "smooth": true,
+      "support": "furniture",
+      "collisionGroup": "prateleira"
+    },
+    {
+      "id": "pe-sofa-1",
+      "shape": "box",
+      "size": [
+        0.08,
+        0.08,
+        0.12
+      ],
+      "position": [
+        0.8742857142857142,
+        -1.32,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "collisionGroup": "sofa",
+      "support": "floor"
+    },
+    {
+      "id": "pe-sofa-2",
+      "shape": "box",
+      "size": [
+        0.08,
+        0.08,
+        0.12
+      ],
+      "position": [
+        1.56,
+        -1.32,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "collisionGroup": "sofa",
+      "support": "floor"
+    },
+    {
+      "id": "pe-sofa-3",
+      "shape": "box",
+      "size": [
+        0.08,
+        0.08,
+        0.12
+      ],
+      "position": [
+        0.8742857142857142,
+        0.72,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "collisionGroup": "sofa",
+      "support": "floor"
+    },
+    {
+      "id": "pe-sofa-4",
+      "shape": "box",
+      "size": [
+        0.08,
+        0.08,
+        0.12
+      ],
+      "position": [
+        1.56,
+        0.72,
+        0.0
+      ],
+      "material": "madeira-escura",
+      "collisionGroup": "sofa",
+      "support": "floor"
+    }
+  ],
+  "assets": [
+    {
+      "id": "planta-janela",
+      "assetId": "potted_plant_01",
+      "position": [
+        -1.5,
+        -2.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "fitHeight": 1.25,
+      "anchor": "bottom",
+      "snapToFloor": true,
+      "support": "floor"
+    },
+    {
+      "id": "quadro-sofa",
+      "assetId": "fancy_picture_frame_01",
+      "position": [
+        -1.61,
+        -1.3,
+        2.22
+      ],
+      "rotation": [
+        0,
+        0,
+        -90
+      ],
+      "fitHeight": 0.42,
+      "anchor": "bottom",
+      "snapToFloor": true,
+      "support": "furniture"
+    }
+  ],
+  "lighting": {
+    "preset": "day",
+    "hdri": {
+      "day": "sky_day",
+      "dusk": "sky_dusk"
+    },
+    "environmentRotation": 200,
+    "overrides": {
+      "sun": {
+        "azimuth": 15,
+        "elevation": 28,
+        "strength": 3.2
+      },
+      "windowFill": {
+        "energy": 260,
+        "color": "#ffe2c4"
+      },
+      "world": {
+        "strength": 0.5
+      }
+    },
+    "interiorFixtures": [
+      {
+        "id": "teto",
+        "type": "AREA",
+        "position": [
+          0.0,
+          -0.2,
+          2.64
+        ],
+        "size": 0.55,
+        "watts": 18,
+        "color": "#ffd7a8",
+        "target": [
+          0.0,
+          -0.2,
+          0.0
+        ]
+      }
+    ]
+  },
+  "camera": {
+    "location": [
+      0.2,
+      1.9,
+      1.15
+    ],
+    "target": [
+      0.0,
+      -0.5,
+      1.15
+    ],
+    "lens": 24.0,
+    "sensorWidth": 36.0,
+    "fstop": 8.0,
+    "focus": "target"
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 128,
+    "resolution": [
+      1280,
+      854
+    ],
+    "preview": {
+      "maxSize": 640,
+      "samples": 64
+    },
+    "render": {
+      "device": "GPU",
+      "adaptive": true,
+      "denoise": true,
+      "maxBounces": 12
+    },
+    "colorManagement": {
+      "viewTransform": "AgX",
+      "look": "AgX - Medium High Contrast",
+      "exposure": -0.75
+    },
+    "output": {
+      "format": "PNG",
+      "transparent": false,
+      "colorDepth": "8"
+    }
+  },
+  "evaluation": {
+    "reference": "../reference/living-room.png",
+    "referenceMask": null,
+    "requireMasks": false,
+    "regions": [
+      {
+        "id": "janela",
+        "label": "Janela / sacada",
+        "rect": [
+          0.33,
+          0.12,
+          0.34,
+          0.55
+        ]
+      },
+      {
+        "id": "sofa",
+        "label": "Sofá",
+        "rect": [
+          0.0,
+          0.4,
+          0.32,
+          0.56
+        ]
+      },
+      {
+        "id": "midia",
+        "label": "Painel de mídia",
+        "rect": [
+          0.68,
+          0.22,
+          0.32,
+          0.62
+        ]
+      },
+      {
+        "id": "piso",
+        "label": "Piso / carpete",
+        "rect": [
+          0.26,
+          0.72,
+          0.48,
+          0.28
+        ]
+      },
+      {
+        "id": "teto",
+        "label": "Teto / sanca",
+        "rect": [
+          0.15,
+          0.0,
+          0.7,
+          0.14
+        ]
+      }
+    ],
+    "thresholds": {
+      "ssimMin": 0.5,
+      "deltaE00Max": 20.0,
+      "deltaE00RegionMax": 30.0,
+      "histogramMax": 0.3,
+      "iouMin": 0.6
+    },
+    "histogramBins": 16,
+    "maxEvalSize": 512,
+    "notes": "Referência: foto de sala de estar (CC BY 2.0) em reference/README.md. Limiares calibrados para este par; são piso de regressão, não prova de fotorrealismo. IoU de silhueta só é avaliado quando render e referência têm máscaras."
+  },
+  "reference": {
+    "image": "../reference/living-room.png",
+    "measurements": {
+      "windowRect": [
+        0.367,
+        0.234,
+        0.196,
+        0.522
+      ],
+      "horizonY": 0.5,
+      "cameraHeight": 1.15,
+      "sofaRect": [
+        0.0,
+        0.35,
+        0.35,
+        0.65
+      ],
+      "tableRect": [
+        0.36,
+        0.63,
+        0.39,
+        0.37
+      ],
+      "notes": "Janela medida por segmentação de brilho (x 0,367-0,563; y 0,234-0,756); horizonte no centro da janela; altura de câmera = centro da janela (1,15 m). Sofá (0-0,35) e mesa (0,36-0,75, y 0,63-1,0) medidos por cor/escuro."
+    },
+    "inventory": [
+      "sanca-janela",
+      "janela-sala",
+      "sofa-base",
+      "rack-base",
+      "tv",
+      "painel-madeira",
+      "mesa-centro-tampo",
+      "prateleira-1",
+      "prateleira-2",
+      "cortina-e-2",
+      "cortina-d-2",
+      "quadro-sofa",
+      "planta-janela",
+      "quadro-sofa"
+    ],
+    "fullyVisible": [
+      "mesa-centro-tampo",
+      "planta-janela",
+      "janela-sala"
+    ]
+  }
+}
