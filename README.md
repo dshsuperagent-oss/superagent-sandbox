@@ -95,3 +95,10 @@ O protótipo também foi exercitado em Chromium via Playwright (criar, editar, a
 ## Pesquisa
 
 O levantamento que embasou as decisões está em [`docs/pesquisa-mapas-mentais.md`](docs/pesquisa-mapas-mentais.md): comparação de 8 ferramentas, os 5 recursos que mais diferenciam as soluções atuais e a arquitetura recomendada para um editor web sem build step.
+
+## Ferramentas
+
+- [`tools/puzzle-monitor/`](tools/puzzle-monitor/README.md) — CLI passivo e somente leitura que acompanha endereços públicos de puzzles de Bitcoin (saldo confirmado, número de transações e mudanças entre snapshots). Funciona online (mempool.space ou blockstream.info) e offline com fixtures; não gera chaves, não assina e não transmite transações.
+- [`docs/pesquisa-cripto-perdida.md`](docs/pesquisa-cripto-perdida.md) — relatório técnico e jurídico sobre criptomoedas "perdidas sem dono": por que chaves perdidas são irrecuperáveis, o que cada categoria permite e por que se apropriar de cripto de terceiros pode ser crime no Brasil.
+
+O monitor não reivindica nem move fundos: ele apenas observa dados públicos. A conclusão do relatório é explícita — não existe caminho legítimo para "achar" criptomoeda de terceiros e ficar com ela.
