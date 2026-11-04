@@ -717,6 +717,11 @@ function planWithRules(request) {
   const ambiguities = buildAmbiguities(raw, subject, options);
   const blocking = ambiguities.filter((item) => item.blocking);
   const { sceneSpec, primaryMaterial: primary } = buildScene(raw, subject, options);
+  try {
+    validateAndNormalize(sceneSpec);
+  } catch (error) {
+    throw new TypeError(`planner gerou sceneSpec inválido: ${error.message}`);
+  }
 
   let confidence = subject.confidence;
   if (options.material) confidence += 0.04;
