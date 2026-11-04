@@ -92,6 +92,20 @@ node --check /tmp/editor-script.js
 
 O protótipo também foi exercitado em Chromium via Playwright (criar, editar, arrastar, conectar, apagar, desfazer, salvar/recarregar, pan, zoom, exportar e importar).
 
+## Blender Director
+
+MVP em **Node 22 stdlib** para o agente dirigir o Blender: recebe um scene-spec JSON, renderiza um preview em resolução baixa, publica o progresso em tempo real por SSE, aceita comandos incrementais de luz/material/câmera e só libera o render final depois de aprovação humana. Funciona sem Blender instalado no modo fixture, usado pelos testes automatizados.
+
+![Viewer do Blender Director com preview e aprovação](docs/img/blender-director-preview.png)
+
+```bash
+node tools/blender-director/server.js --fake-blender   # abra http://127.0.0.1:8137/
+node tools/blender-director/test/e2e.js                # teste sem Blender
+```
+
+- Código, contrato JSON e limitações: [`tools/blender-director/README.md`](tools/blender-director/README.md) e [`schema.md`](tools/blender-director/schema.md).
+- Pesquisa técnica que embasa as decisões: [`docs/pesquisa-blender-3d.md`](docs/pesquisa-blender-3d.md).
+
 ## Pesquisa
 
 O levantamento que embasou as decisões está em [`docs/pesquisa-mapas-mentais.md`](docs/pesquisa-mapas-mentais.md): comparação de 8 ferramentas, os 5 recursos que mais diferenciam as soluções atuais e a arquitetura recomendada para um editor web sem build step.

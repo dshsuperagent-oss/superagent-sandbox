@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "name": "Estúdio — cerâmica, metal e tecido",
+  "engine": "CYCLES",
+  "samples": 256,
+  "resolution": [
+    1600,
+    1000
+  ],
+  "preview": {
+    "maxSize": 640,
+    "samples": 32
+  },
+  "colorManagement": {
+    "viewTransform": "AgX",
+    "look": "AgX - Medium High Contrast",
+    "exposure": 0.2
+  },
+  "render": {
+    "device": "GPU",
+    "adaptive": true,
+    "denoise": true,
+    "maxBounces": 10
+  },
+  "camera": {
+    "location": [
+      3.6,
+      -4.2,
+      2.2
+    ],
+    "target": [
+      0,
+      0,
+      0.75
+    ],
+    "lens": 65,
+    "sensorWidth": 36,
+    "fstop": 2.8,
+    "focus": "target"
+  },
+  "world": {
+    "color": "#101014",
+    "strength": 0.35,
+    "hdri": null
+  },
+  "materials": {
+    "piso": {
+      "baseColor": "#3a3a3d",
+      "metallic": 0,
+      "roughness": 0.32,
+      "textures": [
+        {
+          "type": "noise",
+          "scale": 3.5,
+          "detail": 8,
+          "color1": "#2c2c2f",
+          "color2": "#45454a"
+        }
+      ]
+    },
+    "pedestal": {
+      "baseColor": "#1f2226",
+      "metallic": 0.2,
+      "roughness": 0.4,
+      "normal": {
+        "type": "bump",
+        "strength": 0.15,
+        "scale": 30
+      }
+    },
+    "ceramica": {
+      "baseColor": "#c8b8a4",
+      "metallic": 0,
+      "roughness": 0.12,
+      "ior": 1.5,
+      "coat": 0.6,
+      "normal": {
+        "type": "bump",
+        "strength": 0.04,
+        "scale": 80
+      }
+    },
+    "metal": {
+      "baseColor": "#c9a86a",
+      "metallic": 1,
+      "roughness": 0.18,
+      "anisotropy": 0.3
+    },
+    "tecido": {
+      "baseColor": "#7b2d3a",
+      "metallic": 0,
+      "roughness": 0.85,
+      "sheen": 0.5,
+      "textures": [
+        {
+          "type": "wave",
+          "scale": 22,
+          "distortion": 2,
+          "color1": "#5f202b",
+          "color2": "#913c4b"
+        }
+      ]
+    }
+  },
+  "objects": [
+    {
+      "name": "piso",
+      "primitive": "plane",
+      "transform": {
+        "loc": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          14,
+          14,
+          1
+        ]
+      },
+      "material": "piso"
+    },
+    {
+      "name": "pedestal",
+      "primitive": "cylinder",
+      "transform": {
+        "loc": [
+          0,
+          0,
+          0.4
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          0.8
+        ]
+      },
+      "material": "pedestal",
+      "modifiers": [
+        {
+          "type": "bevel",
+          "width": 0.015,
+          "segments": 4
+        }
+      ]
+    },
+    {
+      "name": "vaso",
+      "primitive": "sphere",
+      "transform": {
+        "loc": [
+          -0.55,
+          0.1,
+          1.18
+        ],
+        "scale": [
+          0.55,
+          0.55,
+          0.75
+        ]
+      },
+      "material": "ceramica",
+      "smooth": true,
+      "modifiers": [
+        {
+          "type": "subsurf",
+          "levels": 1,
+          "renderLevels": 2
+        }
+      ]
+    },
+    {
+      "name": "cubo_metal",
+      "primitive": "cube",
+      "transform": {
+        "loc": [
+          0.72,
+          -0.15,
+          1.05
+        ],
+        "rot": [
+          0,
+          0,
+          -22
+        ],
+        "scale": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "material": "metal",
+      "modifiers": [
+        {
+          "type": "bevel",
+          "width": 0.02,
+          "segments": 4
+        }
+      ]
+    },
+    {
+      "name": "toro_tecido",
+      "primitive": "torus",
+      "transform": {
+        "loc": [
+          0.05,
+          0.55,
+          1.1
+        ],
+        "rot": [
+          70,
+          0,
+          0
+        ],
+        "scale": [
+          0.45,
+          0.45,
+          0.45
+        ]
+      },
+      "material": "tecido",
+      "smooth": true
+    }
+  ],
+  "lights": [
+    {
+      "name": "key",
+      "type": "AREA",
+      "position": [
+        3.4,
+        -2.4,
+        4.2
+      ],
+      "energy": 800,
+      "size": 1.8,
+      "color": "#fff2e2",
+      "target": [
+        0,
+        0,
+        0.9
+      ]
+    },
+    {
+      "name": "fill",
+      "type": "AREA",
+      "position": [
+        -3.8,
+        -1.8,
+        2.6
+      ],
+      "energy": 180,
+      "size": 3.4,
+      "color": "#cfe0ff",
+      "target": [
+        0,
+        0,
+        0.9
+      ]
+    },
+    {
+      "name": "rim",
+      "type": "SPOT",
+      "position": [
+        0.2,
+        3.8,
+        3.4
+      ],
+      "energy": 450,
+      "size": 0.6,
+      "color": "#ffd6b0",
+      "target": [
+        0,
+        0,
+        0.9
+      ],
+      "spotSize": 42,
+      "spotBlend": 0.3
+    }
+  ],
+  "output": {
+    "format": "PNG",
+    "transparent": false
+  }
+}
