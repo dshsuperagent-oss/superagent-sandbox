@@ -1,0 +1,21 @@
+{
+  "description": "Subconjunto de fixtures para testar o monitor sem rede.",
+  "note": "Saldos ficticios/ilustrativos; nao use como snapshot real.",
+  "addresses": [
+    {
+      "label": "puzzle-69",
+      "address": "19vkiEajfhuZ8bs8Zu2jgmC6oqZbWqhxhG",
+      "bits": 69
+    },
+    {
+      "label": "puzzle-70",
+      "address": "19YZECXj3SxEZMoUeJ1yiPsw8xANe7M7QR",
+      "bits": 70
+    },
+    {
+      "label": "puzzle-71",
+      "address": "1PWo3JeB9jrGwfHDNpdGK54CRas7fsVzXU",
+      "bits": 71
+    }
+  ]
+}
