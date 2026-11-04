@@ -2,6 +2,9 @@
 
 Repo sandbox para testes do dsh-superagent (nao usar para trabalho real)
 
+## Sobre
+Este repositorio e um sandbox de testes do dsh-superagent.
+
 ## Editor de mapas mentais (v2)
 
 Editor de mapas mentais em **arquivo único**: [`index.html`](index.html) reúne
