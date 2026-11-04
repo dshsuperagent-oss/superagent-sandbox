@@ -5,6 +5,14 @@ constrói a cena no Blender, mostra um **preview em tempo real** para o usuário
 aceita **comandos incrementais** (luz, material, câmera) e só libera o **render
 final** depois de uma aprovação humana.
 
+A **fase 1 da v2** (este diretório) acrescenta, de forma aditiva, um
+**planner** que transforma um pedido em texto em etapas + scene-spec v1 e um
+**crítico visual** (esqueleto) que converte métricas em correções priorizadas.
+O contrato completo da v2 está em
+[`docs/spec-blender-director-v2.md`](../../docs/spec-blender-director-v2.md) e a
+pesquisa que o embasa em
+[`docs/pesquisa-agentes-blender.md`](../../docs/pesquisa-agentes-blender.md).
+
 Roda com **Node 22 stdlib apenas** — sem `npm install`, sem CDN e sem asset
 externo obrigatório. O Blender real é opcional: um `fake-blender` determinístico
 permite desenvolver o viewer e rodar o e2e em qualquer máquina Linux, mesmo
@@ -32,6 +40,31 @@ sem o Blender instalado.
 5. O usuário clica em **Aprovar render final**; o `build.py` reabre o
    `scene.blend` e renderiza o **final** (resolução/samples do spec). O
    `manifest.json` registra tempos, samples, engine e GPU/CPU.
+
+## Fluxo v2 proposto (fase 1)
+
+O pedido em linguagem natural não vai direto para o Blender. Ele passa por uma
+camada de intenção e por um crítico:
+
+```text
+pedido -> planner -> plano (etapas + scene-spec v1) -> preview -> crítico
+       -> correções priorizadas -> comando/aprovação -> render final
+```
+
+- `POST /plan` devolve o plano e o scene-spec; o viewer mostra
+  **pedido → plano** e permite usar o scene-spec gerado em `POST /jobs`.
+- O planner é determinístico (regras) e não chama API paga. Há um gancho
+  `plan(request, { model })` para a integração com modelo da v2.
+- O crítico recebe métricas prontas (`ssim`, `deltaE`, `psnr`, luminância,
+  checklist) e devolve uma lista priorizada; ele **não** calcula imagem nesta
+  fase e **não promete realismo absoluto**.
+- O gate de aprovação continua sendo humano. A v1 segue funcionando sem o
+  planner; nada do contrato v1 mudou.
+
+![Painel Intenção → plano no viewer](../../docs/img/blender-director-v2-plano.png)
+
+Detalhe de arquitetura, contrato de API v2 e o que fica fora do escopo:
+[`docs/spec-blender-director-v2.md`](../../docs/spec-blender-director-v2.md).
 
 ## Como funciona
 
@@ -111,6 +144,11 @@ curl -s -X POST http://127.0.0.1:8137/jobs/<id>/commands \
 
 # 4. aprova o render final
 curl -s -X POST http://127.0.0.1:8137/jobs/<id>/approve
+
+# alternativa v2: pedido em texto -> plano + scene-spec
+curl -s -X POST http://127.0.0.1:8137/plan \
+  -H "Content-Type: application/json" \
+  -d '{"request":"um frasco de perfume de vidro, fundo branco, foto de produto"}'
 ```
 
 No Windows, `curl.exe` existe no Windows 10/11; em PowerShell também dá para
@@ -181,7 +219,9 @@ Servidor escuta **somente em `127.0.0.1`** (porta padrão `8137`).
 | `GET` | `/final/:job/:arquivo` | PNG/JPEG/EXR do render final. |
 | `GET` | `/jobs/:id/manifest` | `manifest.json` do job. |
 | `GET` | `/examples/:arquivo.json` | Specs de exemplo. |
+| `GET` | `/requests/:arquivo.txt` | Pedidos de exemplo do planner. |
 | `GET` | `/health` | `{ok, version, uptimeSeconds}`. |
+| `POST` | `/plan` | Pedido em texto → plano + scene-spec v1; `200` com o plano. |
 | `POST` | `/jobs` | Cria job; corpo = scene-spec v1; `202 {id, state, stage}`. |
 | `POST` | `/jobs/:id/commands` | Aplica `add_light`/`set_material`/`move_camera`; gera preview; `202`. |
 | `POST` | `/jobs/:id/approve` | Libera o render final; `202`; `409` fora de `approval/waiting`. |
@@ -263,7 +303,7 @@ O modo fixture grava tempos fictícios (`1.3 s`, `7.5 s`) e
 node tools/blender-director/test/e2e.js
 ```
 
-O e2e:
+O e2e (inclui o teste de fixture do planner/crítico):
 
 1. roda `node --check` em todos os `.js` do diretório;
 2. sobe o servidor com `--fake-blender` em porta aleatória;
@@ -271,7 +311,15 @@ O e2e:
 4. cria dois jobs (fila), confere preview PNG 640×400, aplica `add_light`,
    valida novo preview e o resumo da cena;
 5. aprova o final, confere PNG 960×600 e o `manifest.json` com 2 previews;
-6. confirma que a fila avançou para o segundo job e que tudo terminou sem erro.
+6. confirma que a fila avançou para o segundo job e que tudo terminou sem erro;
+7. roda o teste de fixture do planner/crítico e confere `/plan`, `/requests` e
+   que o scene-spec gerado é aceito por `POST /jobs`.
+
+Teste isolado do planner e do crítico (também sem Blender e sem rede):
+
+```bash
+node tools/blender-director/test/planner-e2e.js
+```
 
 Nenhum passo instala Blender ou usa rede externa. Para testar manualmente o
 viewer com o Blender real, use os mesmos comandos do início rápido apontando
@@ -287,10 +335,14 @@ tools/blender-director/
   fake-blender.js    fixture: mesmos eventos + PNG placeholder + manifesto
   lib/spec.js        validação/normalização do schema v1 + comandos
   lib/png.js         encoder PNG e gerador de placeholder (stdlib)
-  viewer/index.html  UI: timeline, preview, métricas, logs, aprovação
-  examples/          cenas e comando de exemplo
+  planner.js         pedido em texto -> plano + scene-spec v1 (regras + gancho)
+  critic.js          métricas -> correções priorizadas (esqueleto)
+  viewer/index.html  UI: timeline, preview, métricas, logs, aprovação e plano
+  examples/          cenas, comando e pedidos de exemplo
   schema.md          contrato JSON v1
   test/e2e.js        teste ponta a ponta sem Blender
+  test/planner-e2e.js teste de fixture do planner e do crítico
+  test/fixtures/     casos esperados do planner e do crítico
 ```
 
 ## Limitações conhecidas
@@ -319,6 +371,14 @@ tools/blender-director/
   configurável, mas o preview é sempre PNG.
 - **Sem SSIM/ΔE no MVP.** A pesquisa explica como medir; a comparação com
   imagem de referência fica para a fase 2.
+- **Planner heurístico.** O `planner.js` da fase 1 entende palavras-chave e
+  monta uma cena plausível; ele não "compreende" o pedido e não substitui o
+  modelo. O gancho `plan(request, { model })` existe para a integração da v2.
+- **Crítico é esqueleto.** `critic.js` recebe métricas prontas; ele não calcula
+  SSIM/ΔE/PSNR nem olha a imagem. A integração real (render -> métricas ->
+  crítico -> correção) fica para o próximo pedido.
+- **Nada de IA paga nesta fase.** Nenhuma chave, nenhuma chamada de rede; o
+  modo fixture cobre o contrato, não a qualidade da imagem.
 - **Sem promessa de fotorrealismo absoluto.** O documento de pesquisa define
   critérios verificáveis e o que é possível com PBR, escala real, HDRI, DOF,
   denoise e pós.

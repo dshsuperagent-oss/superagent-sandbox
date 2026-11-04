@@ -190,6 +190,25 @@
   .metric .sub { margin-top: 2px; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
   .metric .v small { color: var(--muted); font-family: inherit; font-size: 11px; }
 
+  .plan-summary { font-size: 12px; line-height: 1.5; color: var(--text); }
+  .plan-summary .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .plan-summary .pill { font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 7px; color: var(--muted); }
+  .plan-summary .pill.ok { color: var(--ok); border-color: rgba(103,211,145,0.35); }
+  .plan-questions { margin: 10px 0 0; padding: 9px 10px; border: 1px solid rgba(231,193,93,0.3); background: rgba(231,193,93,0.07); border-radius: 8px; }
+  .plan-questions strong { display: block; color: var(--warn); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .plan-questions ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .plan-questions .blocking { color: var(--warn); }
+  .plan-steps { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 7px; }
+  .plan-step { border: 1px solid var(--border-soft); border-radius: 8px; background: var(--bg-input); padding: 8px 10px; }
+  .plan-step .top { display: flex; align-items: center; gap: 8px; }
+  .plan-step .n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #2a1707; background: var(--accent); flex: none; }
+  .plan-step .title { font-size: 12px; font-weight: 600; }
+  .plan-step .desc { margin: 5px 0 0 26px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+  .plan-step .checks { margin: 5px 0 0 26px; color: var(--dim); font-size: 10.5px; line-height: 1.45; }
+  .plan-step .checks .mono { color: var(--muted); }
+  .plan-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .plan-actions .btn { padding: 6px 10px; font-size: 11.5px; }
+
   aside { display: grid; gap: 14px; }
   .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .card h2 { margin: 0; padding: 12px 14px; font-size: 12.5px; font-weight: 650; border-bottom: 1px solid var(--border-soft); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -320,6 +339,28 @@
   </section>
 
   <aside>
+    <section class="card" id="plan-card">
+      <h2>Intenção → plano</h2>
+      <div class="body row">
+        <div>
+          <label class="field" for="request-example">Pedido de exemplo</label>
+          <select id="request-example">
+            <option value="">(escrever manualmente)</option>
+            <option value="request-produto">Produto — frasco de perfume</option>
+            <option value="request-personagem">Personagem — robô low poly</option>
+            <option value="request-interior">Interior — sala minimalista</option>
+          </select>
+        </div>
+        <div>
+          <label class="field" for="request-input">Pedido em linguagem natural</label>
+          <textarea id="request-input" spellcheck="false" style="min-height:96px" placeholder="Ex.: um frasco de perfume de vidro sobre um pedestal, fundo branco, foto de produto."></textarea>
+        </div>
+        <button id="plan-button" class="btn">Gerar plano</button>
+        <p id="plan-hint" class="hint">O plano determinístico vira um scene-spec v1; nada é renderizado nem enviado a serviço pago.</p>
+        <div id="plan-output" class="plan-output" hidden></div>
+      </div>
+    </section>
+
     <section class="card">
       <h2>Novo job</h2>
       <div class="body row">
@@ -356,9 +397,10 @@
 </main>
 
 <footer>
-  Servidor local em <code>127.0.0.1</code> &middot; API: <code>POST /jobs</code>,
-  <code>GET /state</code>, <code>GET /events</code>, <code>POST /jobs/:id/commands</code>,
-  <code>POST /jobs/:id/approve</code> &middot; nenhum asset externo é carregado nesta página.
+  Servidor local em <code>127.0.0.1</code> &middot; API: <code>POST /plan</code>,
+  <code>POST /jobs</code>, <code>GET /state</code>, <code>GET /events</code>,
+  <code>POST /jobs/:id/commands</code>, <code>POST /jobs/:id/approve</code> &middot;
+  nenhum asset externo é carregado nesta página.
 </footer>
 
 <script>
@@ -409,6 +451,11 @@
     cmdCamera: document.getElementById('cmd-camera'),
     flash: document.getElementById('flash'),
     metrics: document.getElementById('metrics'),
+    requestExample: document.getElementById('request-example'),
+    requestInput: document.getElementById('request-input'),
+    planButton: document.getElementById('plan-button'),
+    planHint: document.getElementById('plan-hint'),
+    planOutput: document.getElementById('plan-output'),
     exampleSelect: document.getElementById('example-select'),
     specInput: document.getElementById('spec-input'),
     create: document.getElementById('create'),
@@ -424,6 +471,9 @@
   let flashTimer = null;
   let creating = false;
   let loadingExample = false;
+  let loadingRequest = false;
+  let planning = false;
+  let currentPlan = null;
 
   // ---------------------------------------------------------------------
   // Helpers
@@ -776,9 +826,111 @@
     }
   }
 
+  async function loadRequestExample(name) {
+    if (!name || loadingRequest) return;
+    loadingRequest = true;
+    try {
+      const response = await fetch(`/requests/${name}.txt`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`pedido indisponível: ${response.status}`);
+      els.requestInput.value = (await response.text()).trim();
+      els.planHint.className = 'hint';
+      els.planHint.textContent = `Exemplo “${name}” carregado. Gere o plano para ver etapas e o scene-spec.`;
+    } catch (error) {
+      els.planHint.className = 'hint err';
+      els.planHint.textContent = error.message;
+    } finally {
+      loadingRequest = false;
+    }
+  }
+
+  function renderPlan(result) {
+    currentPlan = result;
+    const ambiguities = Array.isArray(result.ambiguities) ? result.ambiguities : [];
+    const steps = Array.isArray(result.steps) ? result.steps : [];
+    const subject = (result.subject && result.subject.label) || 'plano';
+    const confidence = Math.round((Number(result.confidence) || 0) * 100);
+    const options = result.options || {};
+    const objects = result.sceneSpec && Array.isArray(result.sceneSpec.objects) ? result.sceneSpec.objects.length : 0;
+    const questions = ambiguities.length > 0
+      ? `<div class="plan-questions"><strong>Perguntar antes de renderizar</strong><ul>${ambiguities.map((item) => `<li class="${item.blocking ? 'blocking' : ''}">${escapeHtml(item.question)}${item.blocking ? ' <span class="mono">(bloqueante)</span>' : ''}</li>`).join('')}</ul></div>`
+      : '';
+    const stepsHtml = steps.map((step, index) => {
+      const checks = Array.isArray(step.checks) && step.checks.length > 0
+        ? `<p class="checks"><span class="mono">checks:</span> ${escapeHtml(step.checks.join(' · '))}</p>`
+        : '';
+      return `<li class="plan-step"><div class="top"><span class="n">${index + 1}</span><span class="title">${escapeHtml(step.title || step.id)}</span></div><p class="desc">${escapeHtml(step.description || '')}</p>${checks}</li>`;
+    }).join('');
+    els.planOutput.hidden = false;
+    els.planOutput.innerHTML = `
+      <div class="plan-summary">
+        <strong>${escapeHtml(subject)}</strong> — ${escapeHtml(result.summary || '')}
+        <div class="meta">
+          <span class="pill ok">confiança ${confidence}%</span>
+          <span class="pill">${escapeHtml(options.mood || '—')}</span>
+          <span class="pill">${escapeHtml(options.framing || '—')}</span>
+          <span class="pill">${escapeHtml(options.background || '—')}</span>
+          <span class="pill">${objects} objetos</span>
+        </div>
+      </div>
+      ${questions}
+      <ol class="plan-steps">${stepsHtml}</ol>
+      <div class="plan-actions">
+        <button id="plan-apply" class="btn ghost">Usar como scene-spec</button>
+      </div>`;
+    const apply = document.getElementById('plan-apply');
+    if (apply) apply.addEventListener('click', applyPlan);
+  }
+
+  function applyPlan() {
+    if (!currentPlan || !currentPlan.sceneSpec) return;
+    els.specInput.value = JSON.stringify(currentPlan.sceneSpec, null, 2);
+    els.createHint.className = 'hint ok';
+    els.createHint.textContent = 'Scene-spec gerado a partir do plano. Revise e clique em Enviar scene-spec.';
+    els.specInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function generatePlan() {
+    if (planning) return;
+    const request = els.requestInput.value.trim();
+    if (!request) {
+      els.planHint.className = 'hint err';
+      els.planHint.textContent = 'Escreva um pedido antes de gerar o plano.';
+      return;
+    }
+    planning = true;
+    els.planButton.disabled = true;
+    els.planHint.className = 'hint';
+    els.planHint.textContent = 'Interpretando o pedido em regras determinísticas…';
+    try {
+      const result = await postJson('/plan', { request });
+      renderPlan(result);
+      const blocking = (result.ambiguities || []).filter((item) => item.blocking).length;
+      els.planHint.className = blocking > 0 ? 'hint err' : 'hint ok';
+      els.planHint.textContent = blocking > 0
+        ? `Plano gerado com ${blocking} pergunta(s) bloqueante(s). Responda antes de renderizar.`
+        : `Plano gerado: ${result.steps.length} etapas e scene-spec v1 prontos.`;
+    } catch (error) {
+      els.planHint.className = 'hint err';
+      els.planHint.textContent = error.message;
+    } finally {
+      planning = false;
+      els.planButton.disabled = false;
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Interações
   // ---------------------------------------------------------------------
+
+  els.requestExample.addEventListener('change', () => {
+    loadRequestExample(els.requestExample.value);
+  });
+
+  els.planButton.addEventListener('click', generatePlan);
+
+  els.requestInput.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') generatePlan();
+  });
 
   els.exampleSelect.addEventListener('change', () => {
     loadExample(els.exampleSelect.value);
@@ -896,6 +1048,10 @@
       await loadState();
       connect();
       if (!els.specInput.value.trim()) await loadExample('scene-simple');
+      if (!els.requestInput.value.trim()) {
+        els.requestExample.value = 'request-produto';
+        await loadRequestExample('request-produto');
+      }
     } catch (error) {
       els.connDot.className = 'dot off';
       els.connText.textContent = 'servidor indisponível';

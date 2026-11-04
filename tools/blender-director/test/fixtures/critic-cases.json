@@ -1,0 +1,40 @@
+{
+  "description": "Fixtures do crítico visual: métricas boas, ruins e ausentes. O crítico não calcula imagem; só prioriza correções a partir das métricas e do checklist.",
+  "cases": [
+    {
+      "name": "aprovado",
+      "metrics": {
+        "ssim": 0.91,
+        "deltaE": 2.1,
+        "psnr": 32.4,
+        "luminance": { "mean": 0.5, "clipHigh": 0, "clipLow": 0.005 },
+        "sharpness": 0.42,
+        "checks": { "framing": "ok", "exposure": "ok", "materials": "ok", "composition": "ok", "noise": "ok" }
+      },
+      "expect": { "verdict": "ok", "minScore": 95, "minCorrections": 0, "correctionIds": [] }
+    },
+    {
+      "name": "ruim",
+      "metrics": {
+        "ssim": 0.48,
+        "deltaE": 13.5,
+        "psnr": 17.2,
+        "luminance": { "mean": 0.91, "clipHigh": 0.06, "clipLow": 0.001 },
+        "sharpness": 0.09,
+        "checks": { "framing": "fail", "exposure": "warn", "materials": "warn" }
+      },
+      "expect": {
+        "verdict": "needs-work",
+        "maxScore": 30,
+        "minCorrections": 6,
+        "firstCorrectionIds": ["exposure-clip-high"],
+        "requireIds": ["metric-ssim", "metric-deltaE", "metric-psnr", "exposure-clip-high", "check-framing", "sharpness-low"]
+      }
+    },
+    {
+      "name": "sem-metricas",
+      "metrics": {},
+      "expect": { "verdict": "insufficient-data", "score": 0, "missing": ["ssim", "deltaE", "psnr"] }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "description": "Fixtures do planner determinístico: cada caso fixa o que o modo regras deve devolver para um pedido de examples/request-*.txt. O sceneSpec é validado pelo schema v1 em test/planner-e2e.js.",
+  "steps": ["interpretar", "montar-cena", "modelar", "materiais", "iluminar", "enquadrar", "preview", "criticar", "aprovar"],
+  "cases": [
+    {
+      "requestFile": "request-produto.txt",
+      "expect": {
+        "subjectKind": "product",
+        "recipe": "bottle",
+        "mood": "clean",
+        "framing": "three-quarter",
+        "background": "white",
+        "resolution": [1080, 1080],
+        "objects": 5,
+        "lights": 3,
+        "materials": ["vidro", "metal", "rotulo", "piso"],
+        "ambiguityFields": ["scale"],
+        "confidence": 0.88
+      }
+    },
+    {
+      "requestFile": "request-personagem.txt",
+      "expect": {
+        "subjectKind": "character",
+        "recipe": "character",
+        "mood": "cinematic",
+        "framing": "three-quarter",
+        "background": "black",
+        "resolution": [1200, 800],
+        "objects": 7,
+        "lights": 3,
+        "materials": ["ceramica", "metal", "pele", "piso"],
+        "ambiguityFields": [],
+        "confidence": 0.83
+      }
+    },
+    {
+      "requestFile": "request-interior.txt",
+      "expect": {
+        "subjectKind": "interior",
+        "recipe": "interior",
+        "mood": "clean",
+        "framing": "wide",
+        "background": "dark",
+        "resolution": [1920, 1080],
+        "objects": 8,
+        "lights": 3,
+        "materials": ["metal", "prata", "parede", "luz", "piso"],
+        "ambiguityFields": [],
+        "confidence": 0.87
+      }
+    }
+  ],
+  "blockingAmbiguity": {
+    "request": "Faça uma cena bonita.",
+    "expect": {
+      "subjectKind": "generic",
+      "ambiguityFields": ["subject"],
+      "blocking": true,
+      "maxConfidence": 0.45
+    }
+  },
+  "modelHook": {
+    "request": "Um frasco de perfume de vidro sobre um pedestal.",
+    "modelPlan": {
+      "summary": "Plano vindo do modelo de teste: frasco de vidro, estúdio branco.",
+      "assumptions": ["Modelo externo só ajustou o resumo; a cena veio das regras."],
+      "steps": [
+        { "id": "interpretar", "title": "Interpretar", "description": "Modelo externo", "ops": [], "checks": [] }
+      ]
+    },
+    "expect": { "source": "model", "summaryIncludes": "Plano vindo do modelo de teste", "steps": 1 }
+  }
+}

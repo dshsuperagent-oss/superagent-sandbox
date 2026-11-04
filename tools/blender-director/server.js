@@ -16,6 +16,8 @@
  *   GET  /preview/:job/:file       PNG do preview
  *   GET  /final/:job/:file         imagem do render final
  *   GET  /examples/:file           specs de exemplo
+ *   GET  /requests/:file           pedidos de exemplo do planner (texto)
+ *   POST /plan                     pedido em texto -> plano + scene-spec v1
  *   GET  /jobs/:id/manifest        manifest.json do job
  *   POST /jobs                     cria um job a partir de um scene-spec
  *   POST /jobs/:id/commands        aplica comando incremental e gera preview
@@ -32,9 +34,10 @@ const { URL } = require('node:url');
 
 const { LIMITS, ValidationError, validateAndNormalize, applyCommand } = require('./lib/spec');
 const { createRenderer } = require('./renderer');
+const { plan } = require('./planner');
 const { readPNGDimensions } = require('./lib/png');
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const HOST = '127.0.0.1';
 const SSE_HEARTBEAT_MS = 15000;
 const PREVIEW_FILE_PATTERN = /^preview-\d{3,4}\.png$/;
@@ -649,6 +652,11 @@ async function handleRequest(req, res) {
     if (!/^[a-z0-9-]+\.json$/.test(name)) throw new HttpError(404, 'exemplo não encontrado');
     return sendFile(res, path.join(__dirname, 'examples', name), MIME_BY_EXTENSION['.json']);
   }
+  if (method === 'GET' && pathname.startsWith('/requests/')) {
+    const name = pathname.slice('/requests/'.length);
+    if (!/^request-[a-z0-9-]+\.txt$/.test(name)) throw new HttpError(404, 'pedido de exemplo não encontrado');
+    return sendFile(res, path.join(__dirname, 'examples', name), 'text/plain; charset=utf-8');
+  }
   const previewMatch = /^\/preview\/([a-f0-9]{16})\/(preview-\d{3,4}\.png)$/.exec(pathname);
   if (method === 'GET' && previewMatch) {
     const job = jobById(previewMatch[1]);
@@ -668,6 +676,21 @@ async function handleRequest(req, res) {
     const manifest = job.manifest || readManifest(job.directory);
     if (!manifest) throw new HttpError(404, 'manifesto ainda não disponível');
     return sendJson(res, 200, manifest);
+  }
+  if (method === 'POST' && pathname === '/plan') {
+    assertAllowedOrigin(req);
+    const body = await readJsonBody(req, LIMITS.maxBodyBytes);
+    if (!body || typeof body.request !== 'string' || body.request.trim().length === 0) {
+      throw new HttpError(400, 'corpo deve ser {"request": "pedido em texto"}');
+    }
+    let result;
+    try {
+      result = plan(body.request);
+    } catch (error) {
+      if (error instanceof TypeError) throw new HttpError(400, error.message);
+      throw error;
+    }
+    return sendJson(res, 200, result);
   }
   if (method === 'POST' && pathname === '/jobs') {
     assertAllowedOrigin(req);
