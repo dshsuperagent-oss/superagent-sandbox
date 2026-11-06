@@ -857,8 +857,9 @@ def detectar_rug(img, p, cam, mob):
     """Tapete: mapeia a mascara rosa no plano do piso e usa a borda visivel."""
     L, P = p["L"], p["P"]
     m = mascaras_cor(img)
-    comp = maior_componente(m["rosa"], min_pixels=max(80, int(0.01 * img.shape[0] * img.shape[1])))
-    if comp.sum() < 80:
+    size = img.shape[0]
+    comp = maior_componente(m["rosa"], min_pixels=max(200, int(0.015 * size * size)))
+    if comp.sum() < max(200, int(0.015 * size * size)):
         return None
     xs, ys = _pixels(comp)
     pts = []
@@ -945,8 +946,9 @@ def detectar_sofa(img, p, cam):
     """Sofa: projeta a mascara azul na parede direita e le comprimento/altura."""
     L, P, H = p["L"], p["P"], p["H"]
     m = mascaras_cor(img)
-    comp = maior_componente(m["azul"], min_pixels=max(80, int(0.01 * img.shape[0] * img.shape[1])))
-    if comp.sum() < 80:
+    size = img.shape[0]
+    comp = maior_componente(m["azul"], min_pixels=max(150, int(0.02 * size * size)))
+    if comp.sum() < max(150, int(0.02 * size * size)):
         return None
     xs, ys = _pixels(comp)
     xi_r = L / 2 - 0.05
@@ -972,6 +974,8 @@ def detectar_sofa(img, p, cam):
     if length < 1.0:
         return None
     length = float(np.clip(length, 1.6, min(3.0, P - 0.2)))
+    if ztop < 0.45:
+        return None
     back_h = float(np.clip(ztop + 0.04, 0.62, 1.05))
     cy = float((y0 - 0.62 + y1) / 2.0)
     cy = float(np.clip(cy, -P / 2 + length / 2 + 0.05, P / 2 - length / 2 - 0.05))
