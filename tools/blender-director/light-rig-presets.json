@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "description": "Light rig do Blender Director v3. Cada preset descreve sol (irradiância em W/m²), céu (HDRI ou cor, com força), preenchimento de janela (área em watts) e um multiplicador para as luminárias internas do room plan (potência em watts).",
+  "presets": {
+    "day": {
+      "label": "Dia — sol alto, céu limpo",
+      "exposure": 0.0,
+      "sun": {
+        "enabled": true,
+        "strength": 4.5,
+        "color": "#fff4e6",
+        "angle": 0.6,
+        "azimuth": 150,
+        "elevation": 35
+      },
+      "world": {
+        "kind": "hdri",
+        "color": "#7fa8d8",
+        "strength": 1.0
+      },
+      "windowFill": {
+        "enabled": true,
+        "energy": 1200,
+        "size": 2.8,
+        "color": "#eaf3ff"
+      },
+      "interiorMultiplier": 0.15
+    },
+    "dusk": {
+      "label": "Fim de tarde — sol baixo e quente",
+      "exposure": 0.4,
+      "sun": {
+        "enabled": true,
+        "strength": 1.1,
+        "color": "#ffb070",
+        "angle": 1.0,
+        "azimuth": 245,
+        "elevation": 8
+      },
+      "world": {
+        "kind": "hdri",
+        "color": "#b4694a",
+        "strength": 0.55
+      },
+      "windowFill": {
+        "enabled": true,
+        "energy": 350,
+        "size": 2.8,
+        "color": "#ffc9a0"
+      },
+      "interiorMultiplier": 0.85
+    },
+    "night": {
+      "label": "Noite — só luz interna e céu escuro",
+      "exposure": 0.6,
+      "sun": {
+        "enabled": false,
+        "strength": 0.0,
+        "color": "#8fa6c8",
+        "angle": 0.6,
+        "azimuth": 200,
+        "elevation": 20
+      },
+      "world": {
+        "kind": "color",
+        "color": "#070b14",
+        "strength": 0.02
+      },
+      "windowFill": {
+        "enabled": false,
+        "energy": 0,
+        "size": 2.8,
+        "color": "#8fa6c8"
+      },
+      "interiorMultiplier": 1.0
+    }
+  }
+}

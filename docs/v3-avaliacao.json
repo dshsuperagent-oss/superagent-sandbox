@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "generator": "blender-director/evaluate.py",
+  "generatedAt": "2026-11-04T23:11:12Z",
+  "verdict": "fail",
+  "inputs": {
+    "render": {
+      "path": "/root/.dsh/state/superagent/work/living-room-v3-98f92b76c972/runs/sala/final-001.png",
+      "width": 1280,
+      "height": 854,
+      "sha256": "5d3858bf4064c005a8a902c50fb7962b6245acd5de2f40f6ec49d678ae4e9e90"
+    },
+    "reference": {
+      "path": "/root/.dsh/state/superagent/work/living-room-v3-98f92b76c972/tools/blender-director/reference/living-room.png",
+      "width": 1280,
+      "height": 854,
+      "sha256": "d38a65525e9dbced075ec3a31a6b3be3a9e657d5fb7983f4b3733131f7d86d1b",
+      "resizedToRender": false
+    },
+    "masks": {
+      "render": null,
+      "reference": null
+    }
+  },
+  "geometry": {
+    "comparedAt": [
+      512,
+      342
+    ],
+    "downsampled": true,
+    "maxEvalSize": 512,
+    "ssimBlock": 8
+  },
+  "metrics": {
+    "ssim": 0.230758,
+    "deltaE00": 25.9941,
+    "histogram": {
+      "distance": 0.267454,
+      "bins": 16,
+      "reference": [
+        [
+          0.125845,
+          0.05029,
+          0.033123,
+          0.037555,
+          0.050935,
+          0.077485,
+          0.126028,
+          0.123846,
+          0.075304,
+          0.058068,
+          0.056452,
+          0.065841,
+          0.045162,
+          0.022838,
+          0.021273,
+          0.029954
+        ],
+        [
+          0.15207,
+          0.045419,
+          0.04507,
+          0.05117,
+          0.081055,
+          0.136519,
+          0.127907,
+          0.082048,
+          0.053871,
+          0.044151,
+          0.039045,
+          0.044208,
+          0.033232,
+          0.019291,
+          0.015231,
+          0.029714
+        ],
+        [
+          0.18959,
+          0.068428,
+          0.065681,
+          0.083368,
+          0.134486,
+          0.11219,
+          0.070649,
+          0.048177,
+          0.042683,
+          0.03627,
+          0.025391,
+          0.036515,
+          0.031912,
+          0.013289,
+          0.014808,
+          0.026561
+        ]
+      ],
+      "render": [
+        [
+          0.044288,
+          0.087474,
+          0.056983,
+          0.030171,
+          0.04969,
+          0.033928,
+          0.036995,
+          0.0288,
+          0.047497,
+          0.088222,
+          0.130134,
+          0.134611,
+          0.107428,
+          0.111894,
+          0.011884,
+          0.0
+        ],
+        [
+          0.08387,
+          0.107833,
+          0.055596,
+          0.032164,
+          0.067331,
+          0.071221,
+          0.070752,
+          0.104612,
+          0.08917,
+          0.073819,
+          0.067606,
+          0.072797,
+          0.087811,
+          0.015419,
+          0.0,
+          0.0
+        ],
+        [
+          0.211069,
+          0.060273,
+          0.063619,
+          0.10042,
+          0.090489,
+          0.095183,
+          0.068491,
+          0.048251,
+          0.049473,
+          0.025688,
+          0.054333,
+          0.10737,
+          0.025339,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    "iou": {
+      "value": null,
+      "available": false,
+      "reason": "máscara ausente para: render (sem alpha e sem --render-mask); referência (sem alpha e sem --reference-mask)"
+    }
+  },
+  "regions": [
+    {
+      "id": "janela",
+      "label": "Janela / sacada",
+      "rect": [
+        0.33,
+        0.12,
+        0.34,
+        0.55
+      ],
+      "metrics": {
+        "ssim": 0.171516,
+        "deltaE00": 25.5369,
+        "luminance": 0.33907,
+        "pixels": 32712
+      }
+    },
+    {
+      "id": "sofa",
+      "label": "Sofá",
+      "rect": [
+        0.0,
+        0.4,
+        0.32,
+        0.56
+      ],
+      "metrics": {
+        "ssim": 0.229351,
+        "deltaE00": 17.7549,
+        "luminance": 0.489766,
+        "pixels": 31324
+      }
+    },
+    {
+      "id": "midia",
+      "label": "Painel de mídia",
+      "rect": [
+        0.68,
+        0.22,
+        0.32,
+        0.62
+      ],
+      "metrics": {
+        "ssim": 0.117538,
+        "deltaE00": 32.4237,
+        "luminance": 0.395573,
+        "pixels": 34768
+      }
+    },
+    {
+      "id": "piso",
+      "label": "Piso / carpete",
+      "rect": [
+        0.26,
+        0.72,
+        0.48,
+        0.28
+      ],
+      "metrics": {
+        "ssim": 0.076689,
+        "deltaE00": 25.6323,
+        "luminance": 0.246887,
+        "pixels": 23616
+      }
+    },
+    {
+      "id": "teto",
+      "label": "Teto / sanca",
+      "rect": [
+        0.15,
+        0.0,
+        0.7,
+        0.14
+      ],
+      "metrics": {
+        "ssim": 0.4828,
+        "deltaE00": 22.7471,
+        "luminance": 0.617381,
+        "pixels": 17184
+      }
+    }
+  ],
+  "thresholds": {
+    "ssimMin": 0.5,
+    "deltaE00Max": 20.0,
+    "deltaE00RegionMax": 30.0,
+    "histogramMax": 0.3,
+    "iouMin": 0.6
+  },
+  "checks": [
+    {
+      "metric": "ssim",
+      "value": 0.230758,
+      "threshold": 0.5,
+      "op": ">=",
+      "pass": false
+    },
+    {
+      "metric": "deltaE00",
+      "value": 25.9941,
+      "threshold": 20.0,
+      "op": "<=",
+      "pass": false
+    },
+    {
+      "metric": "histogram",
+      "value": 0.267454,
+      "threshold": 0.3,
+      "op": "<=",
+      "pass": true
+    },
+    {
+      "metric": "deltaE00_region_max",
+      "value": 32.4237,
+      "threshold": 30.0,
+      "op": "<=",
+      "pass": false
+    }
+  ],
+  "masks": {
+    "render": null,
+    "reference": null,
+    "available": false,
+    "reason": "máscara ausente para: render (sem alpha e sem --render-mask); referência (sem alpha e sem --reference-mask)"
+  },
+  "comparison": {
+    "path": "runs/sala/comparison.png",
+    "width": 1452,
+    "height": 320,
+    "panels": [
+      "reference",
+      "render",
+      "difference"
+    ],
+    "regionRects": 5
+  },
+  "limitations": [
+    "SSIM e ΔE00 só são comparáveis com o mesmo enquadramento, resolução e exposição; notas baixas não provam, sozinhas, erro de modelagem.",
+    "ΔE00 mede diferença de cor média por pixel; ela depende de iluminação, tone mapping e do próprio color management (AgX) do render.",
+    "IoU de silhueta só existe quando as duas imagens têm máscara; ele ignora textura, cor e detalhe interno.",
+    "Histograma compara distribuição de cor; duas cenas diferentes podem ter histogramas parecidos.",
+    "A comparação usa a resolução do render; a referência é redimensionada se necessário, o que suaviza detalhes.",
+    "Nenhuma métrica prova fotorrealismo absoluto: elas medem aderência mensurável a uma referência específica."
+  ],
+  "notes": "Referência: foto de sala de estar (CC BY 2.0) em reference/README.md. Limiares calibrados para este par; são piso de regressão, não prova de fotorrealismo. IoU de silhueta só é avaliado quando render e referência têm máscaras.",
+  "config": {
+    "room": "/root/.dsh/state/superagent/work/living-room-v3-98f92b76c972/tools/blender-director/examples/room-living.json"
+  },
+  "elapsedSeconds": 6.368
+}

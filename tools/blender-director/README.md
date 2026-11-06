@@ -400,3 +400,71 @@ O levantamento técnico que embasa o MVP — API `bpy`, modelagem programática,
 PBR, iluminação, câmera, Cycles/Eevee, fotorrealismo, MCPs para Blender,
 armadilhas e referências — está em
 [`docs/pesquisa-blender-3d.md`](../../docs/pesquisa-blender-3d.md).
+
+## v3 — sala de estar medida, portão e avaliação por referência
+
+A v3 é **aditiva**: nada da v1/v2 mudou. Ela monta uma sala a partir de um
+**room plan** medido em metros, abre as janelas com **boolean**, importa
+assets livres (glTF/.blend), monta o light rig dia/crepúsculo/noite e compara
+o render com uma foto.
+
+- Contrato: [`schema-room.md`](schema-room.md)
+- Exemplo: [`examples/room-living.json`](examples/room-living.json)
+- Receita com números: [`docs/receita-sala-de-estar.md`](../../docs/receita-sala-de-estar.md)
+- Pesquisa de método (Claude/ChatGPT): [`docs/pesquisa-claude-3d.md`](../../docs/pesquisa-claude-3d.md)
+- Pesquisa de modelagem/assets/métricas: [`docs/pesquisa-modelagem-agentes.md`](../../docs/pesquisa-modelagem-agentes.md)
+
+### O portão vem antes do render
+
+`build_room.py` roda o [`validate.py`](validate.py) sobre o
+`resolved-room.json` **antes** de chamar o Blender. Regras determinísticas:
+interseção de AABB entre conjuntos (> 2 cm nos 3 eixos), apoio no piso/topo,
+contenção na sala, câmera a ≥ 1 m de sólido, enquadramento de objetos-chave,
+inventário de peças acima de 2,6 m, layout medido da foto (IoU da janela
+≥ 0,70) e asset dentro de móvel. Se reprovar, **não renderiza**.
+
+```bash
+# assets livres (uma vez; sem chave de API)
+node tools/blender-director/assets.js fetch
+node tools/blender-director/assets.js validate --require-files
+
+# resolver + portão (sem Blender)
+python3 tools/blender-director/build_room.py \
+  --room tools/blender-director/examples/room-living.json \
+  --dry-run --resolved runs/sala/resolved-room.json
+python3 tools/blender-director/validate.py --resolved runs/sala/resolved-room.json
+
+# render final (o portão roda de novo)
+blender -b --python-exit-code 1 -P tools/blender-director/build_room.py -- \
+  --room tools/blender-director/examples/room-living.json \
+  --out runs/sala --stage final --progress-json
+
+# comparação com a referência (SSIM/ΔE00/histograma/IoU)
+python3 tools/blender-director/evaluate.py \
+  --render runs/sala/final-001.png \
+  --room tools/blender-director/examples/room-living.json --out runs/sala
+```
+
+O manifesto do job (`runs/<job>/room-manifest.json`) registra as licenças dos
+assets, o preset de luz, watts, exposição, engine/device e os tempos.
+
+### Testes da v3 (sem Blender e sem rede)
+
+```bash
+node tools/blender-director/test/room-e2e.js
+```
+
+Cobrem `node --check` + `py_compile`, schema do room plan, paridade entre o
+resolvedor JS e o `build_room.py --dry-run`, o portão (incluindo os 5 defeitos
+de regressão: planta dentro do rack, TV atravessando prateleira, peça de teto
+sem lastro, câmera dentro do sofá e objeto-chave fora da moldura), assets e o
+`evaluate.py` com imagens sintéticas.
+
+### Limitações da v3
+
+- O room plan é retangular (4 paredes); o portão usa AABB (não malha exata).
+- A fachada externa é um plano com textura procedural, não modelagem do prédio.
+- Não há leitura automática da foto: `reference.measurements` é preenchido
+  medindo a imagem (a receita explica como).
+- As métricas não provam fotorrealismo absoluto; SSIM/ΔE00 comparam pixels de
+  uma reconstrução com uma foto.

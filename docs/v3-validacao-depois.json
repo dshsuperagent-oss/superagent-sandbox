@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "generator": "blender-director/validate.py",
+  "generatedAt": "2026-11-04T23:09:58Z",
+  "ok": true,
+  "rules": {},
+  "errors": [],
+  "warnings": [
+    {
+      "rule": "layout",
+      "message": "janela projeta IoU 0.894 e centro 0.009 contra a referência",
+      "ids": []
+    }
+  ],
+  "summary": {
+    "objects": 62,
+    "openings": 1,
+    "errors": 0,
+    "warnings": 1,
+    "allowMissingAssets": false
+  },
+  "measurements": {
+    "intersectionTolerance": 0.02,
+    "supportGap": 0.02,
+    "cameraMinDistance": 1.0,
+    "inventoryHeight": 2.6,
+    "windowIouMin": 0.7
+  }
+}
