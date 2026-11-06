@@ -16,6 +16,7 @@ desafio). O indice abaixo e a porta de entrada.
 | Otimizacao sem scipy | Refinar parametros com Nelder-Mead em numpy puro | [programacao/otimizacao-sem-scipy.md](programacao/otimizacao-sem-scipy.md) |
 | Metricas de similaridade | Medir MAE/bordas/SSIM e comparar renders | [programacao/metricas-de-similaridade.md](programacao/metricas-de-similaridade.md) |
 | Desempenho e determinismo | Garantir bytes identicos e orcamento de tempo | [programacao/desempenho-e-determinismo.md](programacao/desempenho-e-determinismo.md) |
+| Leitura de PNG sem PIL | Rodar em ambiente minimo (stdlib + numpy) | [programacao/leitura-de-png-sem-pil.md](programacao/leitura-de-png-sem-pil.md) |
 | Semantica do builder | Entender exatamente como cena.json vira render | [blender/semantica-do-builder.md](blender/semantica-do-builder.md) |
 | AgX e cor de material | Calibrar cor base a partir de um render AgX | [blender/agx-e-cores-de-material.md](blender/agx-e-cores-de-material.md) |
 | Luzes e rig de iluminacao | Montar/otimizar sol, area, ambiente e emitter | [blender/luzes-e-rig.md](blender/luzes-e-rig.md) |
