@@ -1,0 +1,275 @@
+{
+  "versao": 1,
+  "sala": {
+    "largura": 3.0,
+    "profundidade": 3.0,
+    "altura": 2.5,
+    "espessura": 0.1,
+    "abertura": {
+      "parede": "fundo",
+      "u0": -0.8,
+      "u1": 0.8,
+      "z0": 0.6,
+      "z1": 1.9
+    }
+  },
+  "materiais": {
+    "parede": {
+      "cor": [
+        0.82,
+        0.8,
+        0.76
+      ],
+      "rugosidade": 0.9
+    },
+    "teto": {
+      "cor": [
+        0.9,
+        0.9,
+        0.88
+      ],
+      "rugosidade": 0.95
+    },
+    "piso": {
+      "cor": [
+        0.4,
+        0.28,
+        0.18
+      ],
+      "rugosidade": 0.5
+    },
+    "mesa": {
+      "cor": [
+        0.3,
+        0.2,
+        0.1
+      ],
+      "rugosidade": 0.4
+    },
+    "metal": {
+      "cor": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "rugosidade": 0.3,
+      "metalico": 1.0
+    },
+    "ceu": {
+      "cor": [
+        0.6,
+        0.75,
+        0.95
+      ],
+      "emissao": [
+        0.6,
+        0.75,
+        0.95
+      ],
+      "forca_emissao": 6.0
+    },
+    "luz": {
+      "cor": [
+        1.0,
+        0.9,
+        0.8
+      ],
+      "emissao": [
+        1.0,
+        0.9,
+        0.8
+      ],
+      "forca_emissao": 3.0
+    }
+  },
+  "objetos": [
+    {
+      "nome": "mesa_topo",
+      "tipo": "cubo",
+      "centro": [
+        0.4,
+        0.3,
+        0.42
+      ],
+      "tamanho": [
+        0.9,
+        0.6,
+        0.06
+      ],
+      "material": "mesa"
+    },
+    {
+      "nome": "mesa_pe_1",
+      "tipo": "cilindro",
+      "centro": [
+        0.0,
+        0.05,
+        0.21
+      ],
+      "tamanho": [
+        0.05,
+        0.05,
+        0.42
+      ],
+      "material": "metal"
+    },
+    {
+      "nome": "mesa_pe_2",
+      "tipo": "cilindro",
+      "centro": [
+        0.8,
+        0.05,
+        0.21
+      ],
+      "tamanho": [
+        0.05,
+        0.05,
+        0.42
+      ],
+      "material": "metal"
+    },
+    {
+      "nome": "mesa_pe_3",
+      "tipo": "cilindro",
+      "centro": [
+        0.0,
+        0.55,
+        0.21
+      ],
+      "tamanho": [
+        0.05,
+        0.05,
+        0.42
+      ],
+      "material": "metal"
+    },
+    {
+      "nome": "mesa_pe_4",
+      "tipo": "cilindro",
+      "centro": [
+        0.8,
+        0.55,
+        0.21
+      ],
+      "tamanho": [
+        0.05,
+        0.05,
+        0.42
+      ],
+      "material": "metal"
+    },
+    {
+      "nome": "lampada",
+      "tipo": "esfera",
+      "centro": [
+        -1.0,
+        -1.0,
+        1.6
+      ],
+      "tamanho": [
+        0.3,
+        0.3,
+        0.3
+      ],
+      "material": "luz"
+    }
+  ],
+  "luzes": [
+    {
+      "tipo": "sol",
+      "direcao": [
+        0.2,
+        -0.8,
+        -0.55
+      ],
+      "energia": 4.0,
+      "cor": [
+        1.0,
+        0.97,
+        0.9
+      ],
+      "angulo_graus": 2.0
+    },
+    {
+      "tipo": "area",
+      "posicao": [
+        -1.0,
+        -1.0,
+        1.6
+      ],
+      "alvo": [
+        -1.0,
+        -1.0,
+        0.0
+      ],
+      "energia": 40.0,
+      "tamanho": 0.4,
+      "cor": [
+        1.0,
+        0.85,
+        0.6
+      ]
+    },
+    {
+      "tipo": "area",
+      "posicao": [
+        0.0,
+        1.45,
+        1.25
+      ],
+      "alvo": [
+        0.0,
+        0.0,
+        1.25
+      ],
+      "energia": 60.0,
+      "tamanho": 1.2,
+      "cor": [
+        0.6,
+        0.75,
+        1.0
+      ]
+    }
+  ],
+  "ambiente": {
+    "cor": [
+      0.6,
+      0.75,
+      0.9
+    ],
+    "forca": 0.25
+  },
+  "cameras": {
+    "A": {
+      "posicao": [
+        -1.1,
+        -1.1,
+        1.5
+      ],
+      "alvo": [
+        0.4,
+        0.6,
+        0.9
+      ],
+      "lente": 24.0
+    },
+    "B": {
+      "posicao": [
+        1.0,
+        -1.05,
+        1.55
+      ],
+      "alvo": [
+        -0.6,
+        0.9,
+        0.9
+      ],
+      "lente": 24.0
+    }
+  },
+  "render": {
+    "resolucao": 256,
+    "amostras": 64,
+    "denoise": true
+  }
+}
