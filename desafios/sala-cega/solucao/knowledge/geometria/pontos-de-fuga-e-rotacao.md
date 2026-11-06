@@ -31,6 +31,9 @@ de fuga (VP) determinam a rotacao e a focal.
 - A linha teto-direita projetada passa a 0,8 px do VP_Y previsto.
 - Erro de 1 px no canto da janela desloca o VP_X em dezenas de px: linhas
   quase paralelas sao mal condicionadas. Sempre reporte/limite o efeito.
+- Sem as guardas, um split em x=55 (janela em x=129) foi escolhido porque as
+  duas linhas eram o proprio teto e o residuo mediano era baixo; com as
+  guardas o canto correto (lado da parede lateral) e escolhido.
 
 ## Quando reutilizar
 - Fotogrametria de interior, AR, correcao de perspectiva.

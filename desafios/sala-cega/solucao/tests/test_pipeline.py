@@ -59,7 +59,7 @@ def _validar_basico(cena):
         if not (-L / 2 - 0.11 <= c[0] <= L / 2 + 0.11 and
                 -P / 2 - 0.11 <= c[1] <= P / 2 + 0.11):
             err.append("objeto fora: " + str(o.get("nome")))
-        if o.get("tipo") != "plano" and c[2] - t[2] / 2 < -0.01:
+        if c[2] - t[2] / 2 < -0.01:
             err.append("abaixo do piso: " + str(o.get("nome")))
     if not cena.get("luzes"):
         err.append("luzes")
@@ -108,6 +108,11 @@ class TestReconstrucao(unittest.TestCase):
         txt = json.dumps(self.cena)
         self.assertNotIn("NaN", txt)
         self.assertNotIn("Infinity", txt)
+
+    def test_orientacao_do_mundo(self):
+        # convencao: sofa na parede do fundo; a abertura fica numa lateral
+        cena = R.reconstruir(R.carregar_imagem(FIXTURE_B), seed=0)
+        self.assertIn(cena["sala"]["abertura"]["parede"], ("esquerda", "direita"))
 
 
 class TestCLI(unittest.TestCase):

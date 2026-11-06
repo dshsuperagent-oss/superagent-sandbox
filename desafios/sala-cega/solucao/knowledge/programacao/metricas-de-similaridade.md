@@ -21,12 +21,13 @@ comparar iteracoes (o avaliador tem a dele).
 - Compare sempre a mesma resolucao (256) e o mesmo recorte.
 
 ## Evidencia
-- `ref-A1.png` x nossa reconstrucao final: MAE 0,0310, IoU 0,574, SSIM
-  0,899 -> similaridade local 0,912. A evolucao foi 0,840 (primeiro fit),
-  0,847 (borda do tapete), 0,902 (sofa/encosto) e 0,912 (tapete+bracos).
-- Calibracao publicada do avaliador: sala vazia 28,7; gabarito 95,0. Nossa
-  similaridade A1 de 0,91 e coerente com uma reconstrucao boa, mas nao
-  perfeita (a vista B1 continua desconhecida).
+- `ref-A1.png` x nossa reconstrucao final (rodada 2): MAE 0,0312, IoU 0,570,
+  SSIM 0,898 -> similaridade local 0,911; sala vazia com a mesma geometria
+  0,538. A evolucao foi 0,840 (primeiro fit), 0,847 (borda do tapete), 0,902
+  (sofa/encosto), 0,912 (rodada 1) e 0,911 (rodada 2, com dois livros).
+- Calibracao publicada do avaliador: sala vazia 28,7; gabarito 95,0. A metrica
+  local deu 0,91, mas o avaliador oficial mediu A1=0,859 na rodada 1: a nossa
+  metrica e otimista. Use-a para ranking, nao como nota.
 - O ajuste de cor por media de regiao subiu a similaridade de 0,745 para
   0,842 em 5 iteracoes (MAE 0,065 -> 0,043).
 

@@ -26,12 +26,25 @@ distinguir tapete (rosa/vermelho), sofa (azul), mesa (madeira) e janela
   inexistente (custa bordas e cor).
 - Pitefall: o livro azul tambem cai na mascara azul; a maior componente deve
   ser o sofa. Se so houver livro, nao crie sofa.
+- Generalizacao de paleta: divida a mascara colorida em familias de matiz
+  (vermelho, laranja, verde, azul, roxo) e escolha a melhor componente de cada
+  familia por geometria (projecao na parede lateral para sofa; mapeamento no
+  piso para tapete). Nao dependa de "azul" ou "rosa".
+- Pitefall de implementacao: `_pixels(mask)` retorna `(xs, ys)`; inverter a
+  ordem em `ys, xs = _pixels(...)` troca todas as coordenadas e contamina
+  centroides/projecoes. Foi a causa de um tapete com geometria absurda e de um
+  livro deslocado; confira a ordem em cada uso.
+- A cor base dos materiais deve vir da componente detectada (media RGB), nao
+  de uma cor fixa por nome; um sofa verde com base azul arruina a cena.
 
 ## Evidencia
 - `ref-A1.png`: mascara azul 6.334 px (sofa + livro), rosa 12.823, madeira 952.
-- Cena sintetica com sofa verde: a mascara azul falhou e o sofa nao foi
-  reconstruido (similaridade B caiu ~0,1). Licao: para generalizar cores, use
-  a componente saturada grande + posicao vertical, nao o hue fixo.
+- Cena sintetica com sofa verde: a mascara azul fixa falhou; com familias de
+  matiz + projecao na parede, o sofa verde passa a ser detectado. A cor media
+  detectada alimenta o material.
+- Cena sintetica com tapete rosa e sofa azul encostados: a uniao colorida virou
+  uma unica componente (20.352 px) e o detector pegou o tapete como sofa. A
+  separacao por familias de matiz resolveu (azul 6.254 / vermelho 12.768).
 - Mesa mapeada no plano 0,44 m recuperou 1,09 x 0,57 m (coerente com a imagem).
 
 ## Quando reutilizar

@@ -14,6 +14,9 @@ builder.
   e z pequeno (0,01). Para "ceu" o builder gira 90 graus; nao gire de novo.
 - Nao coloque objeto abaixo do piso nem fora da sala; o avaliador checa
   plausibilidade. Tapete centrado ingenuamente pode sair da sala.
+- `plano` no chao: `tamanho[2]=1` faz a bbox parecer 0,49 m abaixo do piso;
+  use `tamanho[2]=0,02` (o builder ignora Z do plano). Ver
+  `blender/plausibilidade-e-bbox-de-planos.md`.
 - Camera dentro da sala; `alvo` e um ponto, nao um vetor. Distancia focal em
   mm, nao em pixels.
 - Esfera perto da camera pode cobrir a tela e estourar (foi o que aconteceu

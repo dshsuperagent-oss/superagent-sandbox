@@ -23,9 +23,15 @@ So vemos `ref-A1.png`; a cena reservada (A2) e desconhecida. Para nao testar
   detectado), nao para chumbar a cena 1.
 
 ## Evidencia
-- Rodada final (8 salas, pipeline completo): A medio 0,642, B medio 0,444.
-  Melhor sala: A 0,833 / B 0,609; pior: A 0,358 / B 0,241. A cena 1 fica em
-  0,912 (acima da media, pois o pipeline foi calibrado nela).
+- Rodada 1 (janela no fundo, paleta aleatoria, 8 salas): A medio 0,642,
+  B medio 0,444. Rodada 2 (convencao sofa-no-fundo, janela lateral, paleta
+  fixa): orientacao correta em 5/8; nas 3 falhas o solver caiu no fallback
+  (canto/retas ambiguos) e A/B ficaram baixos. A cena 1 fica em 0,911 (acima
+  da media, pois foi calibrada nela).
+- O harness de convencao gera a cena canonica (janela no fundo, sofa a
+  direita), gira +90 (sofa no fundo, janela esquerda) ou espelha (janela
+  direita) e escolhe uma camera B plausivel. E o teste que expoe o erro de
+  referencial que a vista A nao mostra.
 - Falhas: sofa de cor nao-azul nao detectado; tapete palido confundido com
   piso; canto fora do quadro quebrava a geometria; a priorizacao do encosto
   do sofa melhorou A mas nem sempre B (o braco dianteiro pode estar errado).

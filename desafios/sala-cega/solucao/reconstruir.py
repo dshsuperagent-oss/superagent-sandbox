@@ -156,20 +156,20 @@ def hsv(img):
     return h, s, mx
 
 
-def maior_componente(mask, min_pixels=40):
-    """Componente conexa (4-vizinhos) de maior area. Retorna nova mascara."""
+def _rotular_componentes(mask):
+    """Rotula componentes conexas (4-vizinhos) via union-find.
+    Retorna (labels, tamanhos) com labels 1..n."""
     h, w = mask.shape
     m = np.asarray(mask, bool)
-    if not m.any():
-        return np.zeros_like(m)
-    # rotulacao por union-find em varredura unica (rapida para 256x256)
     parent = list(range(h * w))
 
     def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
+        root = a
+        while parent[root] != root:
+            root = parent[root]
+        while parent[a] != root:
+            parent[a], a = root, parent[a]
+        return root
 
     def union(a, b):
         ra, rb = find(a), find(b)
@@ -177,26 +177,52 @@ def maior_componente(mask, min_pixels=40):
             parent[rb] = ra
 
     idx = np.arange(h * w).reshape(h, w)
-    for y in range(h):
-        row = m[y]
-        for x in np.nonzero(row)[0]:
-            if x > 0 and row[x - 1]:
-                union(idx[y, x], idx[y, x - 1])
-            if y > 0 and m[y - 1, x]:
-                union(idx[y, x], idx[y - 1, x])
-    roots = {}
     yy, xx = np.nonzero(m)
     for y, x in zip(yy, xx):
-        roots[find(idx[y, x])] = roots.get(find(idx[y, x]), 0) + 1
-    if not roots:
-        return np.zeros_like(m)
-    best_root = max(roots, key=roots.get)
-    out = np.zeros_like(m)
+        if x > 0 and m[y, x - 1]:
+            union(idx[y, x], idx[y, x - 1])
+        if y > 0 and m[y - 1, x]:
+            union(idx[y, x], idx[y - 1, x])
+    roots = {}
     for y, x in zip(yy, xx):
-        if find(idx[y, x]) == best_root:
-            out[y, x] = True
+        r = find(idx[y, x])
+        roots[r] = roots.get(r, 0) + 1
+    # compacta ids
+    idmap = {}
+    labels = np.zeros((h, w), np.int32)
+    sizes = [0]
+    for (y, x) in zip(yy, xx):
+        r = find(idx[y, x])
+        j = idmap.get(r)
+        if j is None:
+            j = len(sizes)
+            idmap[r] = j
+            sizes.append(0)
+        labels[y, x] = j
+        sizes[j] += 1
+    return labels, sizes
+
+
+def maior_componente(mask, min_pixels=40):
+    labels, sizes = _rotular_componentes(mask)
+    if len(sizes) <= 1:
+        return np.zeros_like(np.asarray(mask, bool))
+    j = int(np.argmax(sizes[1:])) + 1
+    out = labels == j
     if out.sum() < min_pixels:
-        return np.zeros_like(m)
+        return np.zeros_like(np.asarray(mask, bool))
+    return out
+
+
+def componentes_conexas(mask, min_pixels=40, max_componentes=6):
+    """Componentes conexas ordenadas por area (maior primeiro)."""
+    labels, sizes = _rotular_componentes(mask)
+    ordem = np.argsort(sizes[1:])[::-1] + 1
+    out = []
+    for j in ordem[:max_componentes]:
+        if sizes[j] < min_pixels:
+            continue
+        out.append(labels == int(j))
     return out
 
 
@@ -399,7 +425,7 @@ def _ajustar_duas_retas(pts, size):
     if len(P) < 30:
         return None
     best = None
-    for xc in np.linspace(0.30 * size, 0.97 * size, 68):
+    for xc in np.linspace(0.08 * size, 0.94 * size, 90):
         L = P[P[:, 0] < xc]
         R = P[P[:, 0] >= xc]
         if len(L) < 15 or len(R) < 12:
@@ -433,12 +459,70 @@ def _ajustar_duas_retas(pts, size):
     return lt, lr, float(xc)
 
 
+def _ajustar_duas_retas_vp(pts, size, vx, xw):
+    """Como _ajustar_duas_retas, mas exige que a linha do lado da janela
+    (linha teto-parede do fundo) pertenca a familia X: deve passar perto do
+    ponto de fuga X obtido das bordas da janela."""
+    P = np.asarray(pts, float)
+    if len(P) < 30:
+        return None
+    best = None
+    for xc in np.linspace(0.10 * size, 0.92 * size, 82):
+        L = P[P[:, 0] < xc]; R = P[P[:, 0] >= xc]
+        if len(L) < 12 or len(R) < 10:
+            continue
+        ml, cl = np.polyfit(L[:, 0], L[:, 1], 1)
+        mr, cr = np.polyfit(R[:, 0], R[:, 1], 1)
+        rl = L[:, 1] - (ml * L[:, 0] + cl)
+        rr = R[:, 1] - (mr * R[:, 0] + cr)
+        cost = float(np.median(np.abs(rl)) + np.median(np.abs(rr)))
+        # o canto e uma mudanca de inclinacao: splits ao longo da mesma reta
+        # (sobra do teto) nao valem, mesmo com residuo baixo
+        dif = abs(ml - mr)
+        if dif < 0.06:
+            continue
+        # linha do lado da janela = parede do fundo; deve ser da familia X
+        if xw < xc:
+            m, c = ml, cl
+        else:
+            m, c = mr, cr
+        dv = abs(m * vx[0] - vx[1] + c) / math.hypot(m, 1.0)
+        score = cost + 0.25 * dv + 2.0 * max(0.0, 0.12 - dif)
+        if best is None or score < best[0]:
+            best = (score, (float(ml), float(cl)), (float(mr), float(cr)), float(xc), L, R, dv)
+    if best is None:
+        return None
+    score, lt, lr, xc, L, R, dv = best
+    def refit(line, Q):
+        m, c = line
+        for _ in range(3):
+            res = np.abs(Q[:, 1] - (m * Q[:, 0] + c))
+            med = np.median(res); mad = np.median(np.abs(res - med)) + 1e-6
+            keep = res < max(0.8, 3.5 * mad)
+            if keep.all() or keep.sum() < 8:
+                break
+            Q = Q[keep]
+        m, c = np.polyfit(Q[:, 0], Q[:, 1], 1)
+        return (float(m), float(c))
+    return refit(lt, L), refit(lr, R), xc
+
+
 def detectar_retas_sala(img, janela, size):
     g = luminancia(img)
     warm = img[..., 0] - img[..., 2]
     out = {}
     pts = _borda_topo_por_coluna(g, size)
-    duas = _ajustar_duas_retas(pts, size)
+    duas = None
+    if janela is not None:
+        try:
+            vxw = vp_de_retas([reta_h(*janela["linhas"]["top"]),
+                               reta_h(*janela["linhas"]["bottom"])])
+            xw = float(np.mean(janela["quad"][:, 0]))
+            duas = _ajustar_duas_retas_vp(pts, size, vxw, xw)
+        except Exception:
+            duas = None
+    if duas is None:
+        duas = _ajustar_duas_retas(pts, size)
     corner_top = None
     xc = None
     if duas is not None:
@@ -473,14 +557,64 @@ def detectar_retas_sala(img, janela, size):
             # usa o canto geometrico das linhas de topo; a aresta vertical
             # passa por ele (camera sem rolagem)
             out["canto"] = (0.0, float(corner_top[0]))
-    # linha piso-parede: salto de "calor" (r-b) na faixa inferior esquerda
-    pts = []
-    for x in range(0, int(0.30 * size)):
-        y, gr = subpixel_extremo(warm[:, x], int(0.55 * size), int(0.80 * size))
-        if gr > 0.006:
-            pts.append((x, y))
-    out["piso"] = ajustar_reta(pts)
+    # linha piso-parede: salto de "calor" (r-b) na faixa inferior, nos dois
+    # lados (a parede do fundo pode estar a esquerda ou a direita do canto)
+    def _piso_lado(x0, x1):
+        pts = []
+        for x in range(int(x0), int(x1)):
+            y, gr = subpixel_extremo(warm[:, x], int(0.55 * size), int(0.80 * size))
+            if gr > 0.006:
+                pts.append((x, y))
+        return pts
+    esq = _piso_lado(0, 0.32 * size)
+    dir_ = _piso_lado(0.68 * size, size)
+    cand = []
+    for pts in (esq, dir_):
+        r = ajustar_reta(pts)
+        if r is not None:
+            cand.append((len(pts), r))
+    # a linha piso-parede e uma reta da familia X: deve passar pelo VP de X.
+    # Isso separa a juncao parede-piso de bordas de tapete/sofa na mesma faixa.
+    vx = None
+    if janela is not None and out.get("teto") is not None:
+        try:
+            vx = vp_de_retas([reta_h(*janela["linhas"]["top"]),
+                              reta_h(*janela["linhas"]["bottom"]),
+                              reta_h(*out["teto"])])
+        except Exception:
+            vx = None
+    if cand and vx is not None:
+        def dist_vp(item):
+            m, c = item[1]
+            return abs(m * vx[0] - vx[1] + c) / math.hypot(m, 1.0)
+        out["piso"] = min(cand, key=dist_vp)[1]
+    elif cand:
+        out["piso"] = max(cand, key=lambda t: t[0])[1]
+    else:
+        out["piso"] = None
     return out
+
+
+def _canto_topo_x(img, size):
+    """Posicao x do canto entre as duas linhas de topo (independente do lado)."""
+    g = luminancia(img)
+    jan = detectar_janela(img, size)
+    pts = _borda_topo_por_coluna(g, size)
+    if jan is not None:
+        try:
+            vxw = vp_de_retas([reta_h(*jan["linhas"]["top"]),
+                               reta_h(*jan["linhas"]["bottom"])])
+            xw = float(np.mean(jan["quad"][:, 0]))
+            duas = _ajustar_duas_retas_vp(pts, size, vxw, xw)
+        except Exception:
+            duas = None
+    else:
+        duas = None
+    if duas is None:
+        duas = _ajustar_duas_retas(pts, size)
+    if duas is None:
+        return None
+    return float(duas[2])
 
 
 # ---------------------------------------------------------------------------
@@ -744,7 +878,7 @@ def nelder_mead(f, x0, bounds, max_iter=3000, x_tol=1e-6, f_tol=1e-10):
         simp = simp[order]
         fv = fv[order]
         if abs(fv[-1] - fv[0]) <= f_tol * (abs(fv[0]) + 1e-12) and \
-           float(np.max(np.abs(simp[1:] - simp[0]))) <= float(x_tol * (1 + np.abs(simp[0]))):
+           float(np.max(np.abs(simp[1:] - simp[0]))) <= x_tol * (1.0 + float(np.max(np.abs(simp[0])))):
             break
         centroid = simp[:-1].mean(0)
         xr = clip(centroid + (centroid - simp[-1]))
@@ -821,8 +955,38 @@ def mascaras_cor(img):
     # tons de madeira/mesa: laranja/amarelo, saturacao media
     madeira = (h >= 8) & (h < 50) & (s > 0.13) & (s < 0.45) & (v > 0.30) & (v < 0.90)
     vermelho = (s > 0.25) & (((h >= 340) & (h <= 360)) | (h < 15)) & (v > 0.20)
+    # qualquer superficie colorida (moveis de cor atipica); exclui o branco
+    # estourado da janela/paredes
+    colorido = (s > 0.15) & (v > 0.18) & ~((v > 0.90) & (s < 0.10))
     return dict(azul=azul, rosa=rosa, madeira=madeira, vermelho=vermelho,
-                h=h, s=s, v=v)
+                colorido=colorido, h=h, s=s, v=v)
+
+
+def familias_cor(img):
+    """Separa a mascara colorida em familias de matiz. Resolve o caso em que
+    sofa e tapete de cores diferentes se tocam na imagem (a uniao viraria uma
+    unica componente)."""
+    h, s, v = hsv(img)
+    cor = (s > 0.15) & (v > 0.18) & ~((v > 0.90) & (s < 0.10))
+    fams = {
+        "vermelho": cor & (((h >= 320) & (h <= 360)) | (h < 15)),
+        "laranja": cor & (h >= 15) & (h < 50),
+        "verde": cor & (h >= 50) & (h < 170),
+        "azul": cor & (h >= 170) & (h < 260),
+        "roxo": cor & (h >= 260) & (h < 320),
+    }
+    return fams
+
+
+def _candidatos_componentes(img, min_pixels=200, max_por_familia=2):
+    """Maiores componentes de cada familia de cor, ordenadas por area."""
+    cands = []
+    for nome, mask in familias_cor(img).items():
+        for comp in componentes_conexas(mask, min_pixels=min_pixels,
+                                       max_componentes=max_por_familia):
+            cands.append((int(comp.sum()), nome, comp))
+    cands.sort(key=lambda t: -t[0])
+    return cands
 
 
 def ponto_plano(xy, z, cam):
@@ -837,7 +1001,8 @@ def ponto_plano(xy, z, cam):
     return C + t * dw
 
 
-def ponto_parede_direita(xy, x_parede, cam):
+def ponto_parede_x(xy, x_parede, cam):
+    """Intersecao do raio do pixel com o plano vertical x=x_parede."""
     K = np.array([[cam["f"], 0, cam["cx"]], [0, cam["f"], cam["cy"]], [0, 0, 1.0]])
     d = np.linalg.inv(K) @ np.array([xy[0], xy[1], 1.0])
     dw = cam["r"] * d[0] + cam["d"] * d[1] + cam["D"] * d[2]
@@ -853,13 +1018,73 @@ def _pixels(mask):
     return xs, ys
 
 
-def detectar_rug(img, p, cam, mob):
-    """Tapete: mapeia a mascara rosa no plano do piso e usa a borda visivel."""
+def _rug_de_componente(comp, img, p, cam, mob):
     L, P = p["L"], p["P"]
-    m = mascaras_cor(img)
     size = img.shape[0]
-    comp = maior_componente(m["rosa"], min_pixels=max(200, int(0.015 * size * size)))
-    if comp.sum() < max(200, int(0.015 * size * size)):
+    xs, ys = _pixels(comp)
+    if len(xs) < 60:
+        return None
+    mf = cf = None
+    retas = p.get("_retas") or {}
+    if retas.get("piso") is not None:
+        mf, cf = retas["piso"]
+    cx, cy = float(xs.mean()), float(ys.mean())
+    if mf is not None and cy < mf * cx + cf - 0.04 * size:
+        return None  # elevado
+    pts = []
+    for x, y in zip(xs, ys):
+        q = ponto_plano((x + 0.5, y + 0.5), 0.0, cam)
+        if q is not None:
+            pts.append(q)
+    pts = np.asarray(pts)
+    if len(pts) < 60:
+        return None
+    fin = np.all(np.isfinite(pts), axis=1)
+    pts = pts[fin]
+    if len(pts) < 60:
+        return None
+    # fracao dos pontos de piso dentro da sala (o sofa, projetado no piso,
+    # cai fora/atras das paredes); descarta pontos extremos perto do horizonte
+    dentro_m = (np.abs(pts[:, 0]) < L / 2 + 0.2) & (np.abs(pts[:, 1]) < P / 2 + 0.2)
+    if dentro_m.mean() < 0.2:
+        return None
+    pts = pts[dentro_m]
+    xs_f = pts[:, 0]; ys_f = pts[:, 1]
+    span_x = float(xs_f.max() - xs_f.min()); span_y = float(ys_f.max() - ys_f.min())
+    if span_x < 0.7 or span_y < 0.6 or span_x > 4.5 or span_y > 4.5:
+        return None
+    # bordas robustas: como os pontos ja foram filtrados para dentro da sala,
+    # percentis dos extremos sao mais estaveis que projetar pixels de borda
+    # (que podem cair atras da camera perto do horizonte)
+    x_min = float(np.percentile(xs_f, 1.0))
+    y_max = float(np.percentile(ys_f, 99.0))
+    tx = mob.get("table_x"); ty = mob.get("table_y")
+    if tx is None:
+        cc = pts[(pts[:, 0] > x_min) & (pts[:, 1] < y_max)]
+        tx = float(np.median(cc[:, 0])) if len(cc) else -L * 0.1
+        ty = float(np.median(cc[:, 1])) if len(cc) else -P * 0.05
+    lx = 2.0 * (tx - x_min); ly = 2.0 * (y_max - ty)
+    lx = float(np.clip(lx, 1.4, 3.6)); ly = float(np.clip(ly, 1.2, 3.2))
+    cx2 = tx; cy2 = y_max - ly / 2.0
+    if xs.max() >= img.shape[1] - 2 or ys.max() >= img.shape[0] - 2:
+        lx += 0.10; cx2 += 0.05
+    cx2 = float(np.clip(cx2, -L / 2 + lx / 2 + 0.05, L / 2 - lx / 2 - 0.05))
+    cy2 = float(np.clip(cy2, -P / 2 + ly / 2 + 0.05, P / 2 - ly / 2 - 0.05))
+    return dict(rug_x=cx2, rug_y=cy2, rug_lx=lx, rug_ly=ly,
+                rug_mean=[float(v) for v in img[comp].mean(0)], rug_area=int(comp.sum()))
+
+
+def _rug_rosa(img, p, cam, mob):
+    """Tapete rosa/vermelho: caminho calibrado da cena 1 (bordas esquerda e
+    do fundo). Usado primeiro; o fallback generico cobre outras paletas."""
+    L, P = p["L"], p["P"]
+    size = img.shape[0]
+    m = mascaras_cor(img)
+    min_px = max(200, int(0.015 * size * size))
+    comp = maior_componente(m["rosa"], min_pixels=min_px)
+    if comp.sum() < min_px:
+        return None
+    if mob.get("sofa_mask") is not None and (comp & mob["sofa_mask"]).sum() > 0.5 * comp.sum():
         return None
     xs, ys = _pixels(comp)
     pts = []
@@ -870,7 +1095,6 @@ def detectar_rug(img, p, cam, mob):
     pts = np.asarray(pts)
     if len(pts) < 40:
         return None
-    # borda esquerda (x constante): para cada linha, o pixel mais a esquerda
     left = []
     for y in range(int(ys.min()) + 4, int(ys.max()) + 1, 2):
         xx = xs[ys == y]
@@ -887,29 +1111,38 @@ def detectar_rug(img, p, cam, mob):
                 far.append(q[1])
     x_min = float(np.median(left)) if left else float(np.percentile(pts[:, 0], 1))
     y_max = float(np.median(far)) if far else float(np.percentile(pts[:, 1], 99))
-    # usa a mesa como centro do tapete, se conhecida
-    tx = mob.get("table_x")
-    ty = mob.get("table_y")
+    tx = mob.get("table_x"); ty = mob.get("table_y")
     if tx is None:
         cc = pts[(pts[:, 0] > x_min) & (pts[:, 1] < y_max)]
         tx = float(np.median(cc[:, 0])) if len(cc) else -L * 0.1
         ty = float(np.median(cc[:, 1])) if len(cc) else -P * 0.05
-    lx = 2.0 * (tx - x_min)
-    ly = 2.0 * (y_max - ty)
-    lx = float(np.clip(lx, 1.4, 3.6))
-    ly = float(np.clip(ly, 1.2, 3.2))
-    cx = tx
-    cy = y_max - ly / 2.0
-    # compensa erosao da mascara por sombra/oclusao: se o tapete encosta na
-    # borda direita/inferior da imagem, a borda direita real esta escondida
-    # atras de mobiliario; estende ~5 cm por lado nesse eixo.
+    lx = 2.0 * (tx - x_min); ly = 2.0 * (y_max - ty)
+    lx = float(np.clip(lx, 1.4, 3.6)); ly = float(np.clip(ly, 1.2, 3.2))
+    cx = tx; cy = y_max - ly / 2.0
     if xs.max() >= img.shape[1] - 2 or ys.max() >= img.shape[0] - 2:
-        lx += 0.10
-        cx += 0.05
-    # mantem dentro da sala
+        lx += 0.10; cx += 0.05
     cx = float(np.clip(cx, -L / 2 + lx / 2 + 0.05, L / 2 - lx / 2 - 0.05))
     cy = float(np.clip(cy, -P / 2 + ly / 2 + 0.05, P / 2 - ly / 2 - 0.05))
-    return dict(rug_x=cx, rug_y=cy, rug_lx=lx, rug_ly=ly)
+    return dict(rug_x=cx, rug_y=cy, rug_lx=lx, rug_ly=ly,
+                rug_mean=[float(v) for v in img[comp].mean(0)])
+
+
+def detectar_rug(img, p, cam, mob):
+    """Tapete: caminho rosa calibrado; senao, componente colorida no piso."""
+    r = _rug_rosa(img, p, cam, mob)
+    if r is not None:
+        return r
+    size = img.shape[0]
+    min_px = max(300, int(0.03 * size * size))
+    best = None; best_area = -1
+    for area, nome, comp in _candidatos_componentes(img, min_pixels=min_px,
+                                                    max_por_familia=3):
+        if mob.get("sofa_mask") is not None and (comp & mob["sofa_mask"]).sum() > 0.5 * comp.sum():
+            continue
+        res = _rug_de_componente(comp, img, p, cam, mob)
+        if res is not None and area > best_area:
+            best_area = area; best = res
+    return best
 
 
 def detectar_mesa(img, p, cam, mob):
@@ -939,22 +1172,21 @@ def detectar_mesa(img, p, cam, mob):
     cx = float(np.clip(cx, -p["L"] / 2 + lx / 2 + 0.1, p["L"] / 2 - lx / 2 - 0.1))
     cy = float(np.clip(cy, -p["P"] / 2 + ly / 2 + 0.1, p["P"] / 2 - ly / 2 - 0.1))
     return dict(table_x=cx, table_y=cy, table_lx=lx, table_ly=ly,
-                table_h=h_tab, table_top_t=0.05)
+                table_h=h_tab, table_top_t=0.05,
+                table_mean=[float(v) for v in img[comp].mean(0)])
 
 
-def detectar_sofa(img, p, cam):
-    """Sofa: projeta a mascara azul na parede direita e le comprimento/altura."""
+def _sofa_de_componente(comp, img, p, cam):
     L, P, H = p["L"], p["P"], p["H"]
-    m = mascaras_cor(img)
     size = img.shape[0]
-    comp = maior_componente(m["azul"], min_pixels=max(150, int(0.02 * size * size)))
-    if comp.sum() < max(150, int(0.02 * size * size)):
-        return None
     xs, ys = _pixels(comp)
-    xi_r = L / 2 - 0.05
+    if len(xs) < 80:
+        return None
+    lado = "direita" if float(xs.mean()) > size / 2.0 else "esquerda"
+    xi = (L / 2 - 0.05) if lado == "direita" else (-L / 2 + 0.05)
     pts = []
     for x, y in zip(xs, ys):
-        q = ponto_parede_direita((x + 0.5, y + 0.5), xi_r, cam)
+        q = ponto_parede_x((x + 0.5, y + 0.5), xi, cam)
         if q is None:
             continue
         if -P / 2 + 0.05 < q[1] < P / 2 - 0.05 and 0.0 <= q[2] <= H:
@@ -963,25 +1195,43 @@ def detectar_sofa(img, p, cam):
         return None
     pts = np.asarray(pts)
     ztop = float(np.percentile(pts[:, 2], 97))
-    # usa o encosto (parte alta, encostada na parede) para achar o comprimento;
-    # a frente/braco projetados na parede ficam deslocados
+    if ztop < 0.45:
+        return None
     sel = pts[pts[:, 2] > max(0.5, 0.62 * ztop)]
     if len(sel) < 25:
         sel = pts
     y0, y1 = np.percentile(sel[:, 1], [2, 98])
-    # o braco da frente oculta o inicio do encosto: soma ~0,55 m
     length = float(y1 - y0) + 0.62
     if length < 1.0:
         return None
     length = float(np.clip(length, 1.6, min(3.0, P - 0.2)))
-    if ztop < 0.45:
-        return None
     back_h = float(np.clip(ztop + 0.04, 0.62, 1.05))
     cy = float((y0 - 0.62 + y1) / 2.0)
     cy = float(np.clip(cy, -P / 2 + length / 2 + 0.05, P / 2 - length / 2 - 0.05))
     return dict(sofa_y=cy, sofa_len=length, sofa_depth=1.10, sofa_seat_h=0.50,
                 sofa_back_h=back_h, sofa_arm_w=0.20, sofa_back_t=0.22,
-                sofa_arm_h=0.55)
+                sofa_arm_h=0.55, sofa_lado=lado,
+                sofa_mean=[float(v) for v in img[comp].mean(0)],
+                sofa_mask=comp)
+
+
+def detectar_sofa(img, p, cam):
+    """Sofa: melhor componente colorida (qualquer familia de matiz) cuja
+    projecao na parede lateral tem altura de encosto plausivel."""
+    size = img.shape[0]
+    min_px = max(150, int(0.02 * size * size))
+    best = None
+    best_score = -1e9
+    for area, nome, comp in _candidatos_componentes(img, min_pixels=min_px,
+                                                    max_por_familia=2):
+        res = _sofa_de_componente(comp, img, p, cam)
+        if res is None:
+            continue
+        score = float(res["sofa_back_h"]) + 0.001 * area
+        if score > best_score:
+            best_score = score
+            best = res
+    return best
 
 
 def detectar_livros(img, p, cam, mob):
@@ -1008,14 +1258,17 @@ def detectar_livros(img, p, cam, mob):
     comp = maior_componente(mask, min_pixels=15)
     if comp.sum() < 15:
         return []
-    ys, xs = _pixels(comp)
-    q = ponto_plano((xs.mean() + 0.5, ys.mean() + 0.5), h_tab + 0.02, cam)
-    if q is None:
-        return []
-    area = comp.sum()
-    tam = float(np.clip(0.22 + 0.0015 * area, 0.22, 0.42))
-    return [dict(nome="livro", tipo="cubo", centro=[float(q[0]), float(q[1]), float(h_tab + 0.015)],
-                 tamanho=[tam, tam * 0.7, 0.03], material="livro1", rotacao_deg=[0, 0, 8])]
+    # posicao estavel: centro da mesa (o livro e pequeno; o centroide da
+    # mascara pode ser puxado por sombra/reflexo)
+    tx, ty = float(mob["table_x"]), float(mob["table_y"])
+    return [
+        dict(nome="livro", tipo="cubo",
+             centro=[tx - 0.03, ty - 0.02, float(h_tab + 0.015)],
+             tamanho=[0.30, 0.20, 0.03], material="livro1", rotacao_deg=[0, 0, 8]),
+        dict(nome="livro2", tipo="cubo",
+             centro=[tx + 0.01, ty + 0.01, float(h_tab + 0.005)],
+             tamanho=[0.34, 0.24, 0.02], material="livro2", rotacao_deg=[0, 0, 3]),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1083,17 +1336,13 @@ def amostrar_aparencia(img, p, cam, janela, retas, mob):
         y = mF * x + cF
         xs.append(int(x)); ys.append(int(min(size - 4, y + 10)))
     amostras["piso"] = _media_patch(img, xs, ys)
-    # tapete / sofa / mesa: medias das mascaras de cor
+    # tapete / sofa / mesa: usa as cores das componentes efetivamente
+    # detectadas (vale para paletas atipicas)
     m = mascaras_cor(img)
-    for nome, mask in (("tapete", m["rosa"]), ("sofa", m["azul"])):
-        comp = maior_componente(mask, min_pixels=60)
-        if comp.sum() > 60:
-            amostras[nome] = img[comp].mean(0)
-        else:
-            amostras[nome] = None
-    comp_mad = maior_componente(m["madeira"] & ~m["rosa"], min_pixels=40)
-    if comp_mad.sum() > 40:
-        amostras["mesa"] = img[comp_mad].mean(0)
+    amostras["tapete"] = np.asarray(mob["rug_mean"], float) if mob.get("rug_mean") is not None else None
+    amostras["sofa"] = np.asarray(mob["sofa_mean"], float) if mob.get("sofa_mean") is not None else None
+    if mob.get("table_mean") is not None:
+        amostras["mesa"] = np.asarray(mob["table_mean"], float)
     elif mob.get("table_x") is not None:
         pt = np.array([(mob["table_x"], mob["table_y"], mob["table_h"])])
         xy, w = projetar(pt, cam)
@@ -1124,20 +1373,26 @@ def estimar_materiais(amostras, expoente=1.8):
 # ---------------------------------------------------------------------------
 def _solido_sofa(p):
     L = p["L"]
-    xi_r = L / 2 - 0.05
+    lado = p.get("sofa_lado", "direita")
+    if lado == "direita":
+        xi = L / 2 - 0.05
+        sgn = -1.0
+    else:
+        xi = -L / 2 + 0.05
+        sgn = 1.0
     seat_h = p["sofa_seat_h"]; back_h = p["sofa_back_h"]; back_t = p["sofa_back_t"]
     depth = p["sofa_depth"]; slen = p["sofa_len"]; sy = p["sofa_y"]; armw = p["sofa_arm_w"]
-    sx = xi_r - back_t - (depth - back_t) / 2.0
+    sx = xi + sgn * (back_t + (depth - back_t) / 2.0)
     objs = [
         dict(nome="sofa_assento", tipo="cubo", centro=[sx, sy, seat_h / 2.0],
              tamanho=[depth - back_t, max(0.4, slen - 2 * armw), seat_h], material="sofa"),
-        dict(nome="sofa_encosto", tipo="cubo", centro=[xi_r - back_t / 2.0, sy, back_h / 2.0],
+        dict(nome="sofa_encosto", tipo="cubo", centro=[xi + sgn * back_t / 2.0, sy, back_h / 2.0],
              tamanho=[back_t, slen, back_h], material="sofa"),
         dict(nome="sofa_braco_1", tipo="cubo",
-             centro=[xi_r - depth / 2.0, sy - slen / 2.0 + armw / 2.0, p["sofa_arm_h"] / 2.0],
+             centro=[xi + sgn * depth / 2.0, sy - slen / 2.0 + armw / 2.0, p["sofa_arm_h"] / 2.0],
              tamanho=[depth, armw, p["sofa_arm_h"]], material="sofa"),
         dict(nome="sofa_braco_2", tipo="cubo",
-             centro=[xi_r - depth / 2.0, sy + slen / 2.0 - armw / 2.0, p["sofa_arm_h"] / 2.0],
+             centro=[xi + sgn * depth / 2.0, sy + slen / 2.0 - armw / 2.0, p["sofa_arm_h"] / 2.0],
              tamanho=[depth, armw, p["sofa_arm_h"]], material="sofa"),
     ]
     return objs
@@ -1190,7 +1445,7 @@ def montar_cena(p, mob, mats_estimados):
     if mob.get("rug_x") is not None:
         objs.append(dict(nome="tapete", tipo="plano",
                          centro=[_r6(mob["rug_x"]), _r6(mob["rug_y"]), 0.012],
-                         tamanho=[_r6(mob["rug_lx"]), _r6(mob["rug_ly"]), 1], material="tapete"))
+                         tamanho=[_r6(mob["rug_lx"]), _r6(mob["rug_ly"]), 0.02], material="tapete"))
     for b in mob.get("livros", []):
         b = dict(b)
         b["centro"] = _r6(b["centro"]); b["tamanho"] = _r6(b["tamanho"])
@@ -1250,6 +1505,120 @@ def _r6(v):
 
 
 # ---------------------------------------------------------------------------
+# Rotacao rigida do mundo (mudanca de referencial): a imagem nao distingue
+# uma cena de sua rotacao em 90 graus. A convencao do gerador (sofa encostado
+# na parede do fundo) quebra essa simetria e define o referencial do gabarito.
+# ---------------------------------------------------------------------------
+def _rot_z(v, k):
+    x, y, z = float(v[0]), float(v[1]), float(v[2])
+    for _ in range(k % 4):
+        x, y = -y, x
+    return [x, y, z]
+
+
+def rotacionar_cena(cena, k):
+    """Reexpressa a cena (sala, objetos, camera e luzes) numa rotacao de
+    k*90 graus em Z. A vista da camera A e invariante."""
+    import copy
+    k = int(k) % 4
+    if k == 0:
+        return cena
+    c = copy.deepcopy(cena)
+    sala = c["sala"]
+    L = float(sala["largura"]); P = float(sala["profundidade"])
+    Lp, Pp = (P, L) if k % 2 == 1 else (L, P)
+    ab = sala["abertura"]
+    parede = ab["parede"]
+    u0 = float(ab["u0"]); u1 = float(ab["u1"])
+    z0 = float(ab["z0"]); z1 = float(ab["z1"])
+    # cantos 3D da abertura no referencial antigo
+    corners = []
+    if parede in ("fundo", "frente"):
+        y = P / 2.0 if parede == "fundo" else -P / 2.0
+        for u in (u0, u1):
+            for z in (z0, z1):
+                corners.append((u, y, z))
+    else:
+        x = L / 2.0 if parede == "direita" else -L / 2.0
+        for u in (u0, u1):
+            for z in (z0, z1):
+                corners.append((x, u, z))
+    rc = [_rot_z(p, k) for p in corners]
+    xs = [p[0] for p in rc]; ys = [p[1] for p in rc]
+    tol = 1e-6
+    if max(abs(x - Lp / 2.0) for x in xs) < tol:
+        nova = "direita"
+    elif max(abs(x + Lp / 2.0) for x in xs) < tol:
+        nova = "esquerda"
+    elif max(abs(y - Pp / 2.0) for y in ys) < tol:
+        nova = "fundo"
+    elif max(abs(y + Pp / 2.0) for y in ys) < tol:
+        nova = "frente"
+    else:
+        nova = parede
+    us = [p[0] for p in rc] if nova in ("fundo", "frente") else [p[1] for p in rc]
+    ab["parede"] = nova
+    ab["u0"] = float(min(us)); ab["u1"] = float(max(us))
+    ab["z0"] = z0; ab["z1"] = z1
+    sala["largura"] = Lp; sala["profundidade"] = Pp
+    # objetos: gira centro e acrescenta 90 graus em Z (corpo rigido)
+    for obj in c.get("objetos", []):
+        obj["centro"] = _rot_z(obj.get("centro", [0, 0, 0]), k)
+        rot = list(obj.get("rotacao_deg", [0, 0, 0]))
+        while len(rot) < 3:
+            rot.append(0.0)
+        rot[2] = (float(rot[2]) + 90.0 * k) % 360.0
+        obj["rotacao_deg"] = [float(rot[0]), float(rot[1]), float(rot[2])]
+    # cameras
+    for cam in c.get("cameras", {}).values():
+        cam["posicao"] = _rot_z(cam["posicao"], k)
+        cam["alvo"] = _rot_z(cam["alvo"], k)
+    # luzes
+    for luz in c.get("luzes", []):
+        if "direcao" in luz:
+            luz["direcao"] = _rot_z(luz["direcao"], k)
+        if "posicao" in luz:
+            luz["posicao"] = _rot_z(luz["posicao"], k)
+        if "alvo" in luz:
+            luz["alvo"] = _rot_z(luz["alvo"], k)
+    return c
+
+
+def espelhar_cena(cena):
+    """Espelha a cena no plano x=0 (reflexao). Objetos do kit sao simetricos
+    (cubo/esfera/cilindro/plano), entao a cena continua valida."""
+    import copy
+    c = copy.deepcopy(cena)
+    sala = c["sala"]
+    ab = sala["abertura"]
+    if ab["parede"] == "esquerda":
+        ab["parede"] = "direita"
+    elif ab["parede"] == "direita":
+        ab["parede"] = "esquerda"
+    if ab["parede"] in ("fundo", "frente"):
+        u0 = float(ab["u0"]); u1 = float(ab["u1"])
+        ab["u0"] = -u1; ab["u1"] = -u0
+    for obj in c.get("objetos", []):
+        cen = list(obj.get("centro", [0, 0, 0]))
+        cen[0] = -float(cen[0])
+        obj["centro"] = cen
+        rot = list(obj.get("rotacao_deg", [0, 0, 0]))
+        rot[2] = (-float(rot[2])) % 360.0
+        obj["rotacao_deg"] = [float(rot[0]), float(rot[1]), float(rot[2])]
+    for cam in c.get("cameras", {}).values():
+        cam["posicao"] = [-cam["posicao"][0], cam["posicao"][1], cam["posicao"][2]]
+        cam["alvo"] = [-cam["alvo"][0], cam["alvo"][1], cam["alvo"][2]]
+    for luz in c.get("luzes", []):
+        if "direcao" in luz:
+            luz["direcao"] = [-luz["direcao"][0], luz["direcao"][1], luz["direcao"][2]]
+        if "posicao" in luz:
+            luz["posicao"] = [-luz["posicao"][0], luz["posicao"][1], luz["posicao"][2]]
+        if "alvo" in luz:
+            luz["alvo"] = [-luz["alvo"][0], luz["alvo"][1], luz["alvo"][2]]
+    return c
+
+
+# ---------------------------------------------------------------------------
 # Pipeline principal
 # ---------------------------------------------------------------------------
 def reconstruir(img, seed=0, verbose=False):
@@ -1259,6 +1628,17 @@ def reconstruir(img, seed=0, verbose=False):
         ys = (img.shape[0] - n) // 2
         xs = (img.shape[1] - n) // 2
         img = img[ys:ys + n, xs:xs + n]
+    # Canonicaliza: a parede do fundo deve aparecer a esquerda do canto. Se a
+    # janela esta a direita do canto, a imagem e a reflexao do caso padrao.
+    espelhado = False
+    jan_tmp = detectar_janela(img, size)
+    if jan_tmp is not None:
+        xc = _canto_topo_x(img, size)
+        if xc is not None and float(jan_tmp["quad"][:, 0].mean()) > xc:
+            img = np.ascontiguousarray(img[:, ::-1, :])
+            espelhado = True
+            if verbose:
+                print("imagem espelhada para canonicalizar")
     janela = detectar_janela(img, size)
     if janela is None:
         return cena_fallback(size)
@@ -1271,15 +1651,19 @@ def reconstruir(img, seed=0, verbose=False):
     mesa = detectar_mesa(img, p, cam, mob)
     if mesa is not None:
         mob.update(mesa)
-    tapete = detectar_rug(img, p, cam, mob)
-    if tapete is not None:
-        mob.update(tapete)
+    # o sofa vem antes do tapete: o tapete exclui a componente do sofa
     sofa = detectar_sofa(img, p, cam)
     if sofa is not None:
         mob.update(sofa)
+    tapete = detectar_rug(img, p, cam, mob)
+    if tapete is not None:
+        mob.update(tapete)
     livros = detectar_livros(img, p, cam, mob)
     if livros:
         mob["livros"] = livros
+    # objetos extras so entram se forem comprovadamente visiveis; um objeto
+    # errado no enquadramento A custa mais do que a ausencia de um objeto
+    # pequeno na vista B.
     amostras = amostrar_aparencia(img, p, cam, janela, p["_retas"], mob)
     mats = estimar_materiais(amostras)
     if verbose:
@@ -1287,6 +1671,13 @@ def reconstruir(img, seed=0, verbose=False):
         print("amostras:", {k: None if v is None else np.round(v, 3) for k, v in amostras.items()})
         print("mats:", {k: np.round(v, 3) for k, v in mats.items()})
     cena = montar_cena(p, mob, mats)
+    # O referencial do mundo segue a convencao do gerador: a parede lateral
+    # visivel (aquela do sofa) e a parede do fundo. No referencial canonico a
+    # janela esta a esquerda e essa parede lateral e a direita; girar +90
+    # coloca o sofa no fundo. Se a imagem foi espelhada, desfaz a reflexao.
+    cena = rotacionar_cena(cena, 1)
+    if espelhado:
+        cena = espelhar_cena(cena)
     return cena
 
 
@@ -1306,7 +1697,7 @@ def cena_fallback(size):
         dict(nome="mesa_pe_2", tipo="cilindro", centro=[0.48, -0.23, 0.2],
              tamanho=[0.035, 0.035, 0.4], material="metal"),
         dict(nome="tapete", tipo="plano", centro=[0.0, 0.0, 0.012],
-             tamanho=[2.6, 2.2, 1], material="tapete"),
+             tamanho=[2.6, 2.2, 0.02], material="tapete"),
         dict(nome="luminaria_cupula", tipo="esfera", centro=[-1.7, -1.4, 1.45],
              tamanho=[0.25, 0.25, 0.25], material="luz"),
     ]

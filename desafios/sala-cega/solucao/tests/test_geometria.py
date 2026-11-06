@@ -71,6 +71,35 @@ class TestRetasEVPs(unittest.TestCase):
         self.assertAlmostEqual(float(np.linalg.det(Rw)), 1.0, places=6)
 
 
+class TestRotacaoEEspelho(unittest.TestCase):
+    def test_rotacao_90_troca_lados_e_abertura(self):
+        cena = R.cena_fallback(256)
+        L = cena["sala"]["largura"]; P = cena["sala"]["profundidade"]
+        g = R.rotacionar_cena(cena, 1)
+        self.assertAlmostEqual(g["sala"]["largura"], P, places=6)
+        self.assertAlmostEqual(g["sala"]["profundidade"], L, places=6)
+        self.assertNotEqual(g["sala"]["abertura"]["parede"], cena["sala"]["abertura"]["parede"])
+        self.assertEqual(set(g["sala"]), set(cena["sala"]))
+
+    def test_quatro_rotacoes_voltam_ao_original(self):
+        cena = R.cena_fallback(256)
+        g = cena
+        for _ in range(4):
+            g = R.rotacionar_cena(g, 1)
+        self.assertAlmostEqual(g["sala"]["largura"], cena["sala"]["largura"], places=6)
+        self.assertAlmostEqual(g["sala"]["profundidade"], cena["sala"]["profundidade"], places=6)
+        np.testing.assert_allclose(g["cameras"]["A"]["posicao"],
+                                   cena["cameras"]["A"]["posicao"], atol=1e-6)
+
+    def test_espelho_duplo(self):
+        cena = R.cena_fallback(256)
+        g = R.espelhar_cena(R.espelhar_cena(cena))
+        self.assertAlmostEqual(g["cameras"]["A"]["posicao"][0],
+                               cena["cameras"]["A"]["posicao"][0], places=6)
+        self.assertEqual(g["sala"]["abertura"]["parede"],
+                         cena["sala"]["abertura"]["parede"])
+
+
 class TestHomografia(unittest.TestCase):
     def test_homografia_retangulo(self):
         # camera olhando para uma parede em y=3; retangulo de 2 x 1 m
