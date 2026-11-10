@@ -6,6 +6,10 @@ sem dependências**: `node serve.mjs` servindo a pasta e o jogo abre em
 ES, áudio 100% sintetizado com WebAudio (zero arquivo de áudio) e efeitos procedurais
 (sem imagens/modelos externos).
 
+Também é **instalável como app (PWA)** em **Android e iPad** e tem **controles de toque**
+(um dedo gira, pinça dá zoom, toque constrói). Publicado em HTTPS:
+**https://dshsuperagent-oss.github.io/superagent-sandbox/**
+
 - **3 cenários × 8 ondas = 24 ondas** (Deserto, Neve, Cidade), com chefes nas ondas
   8, 16 e 24.
 - **10 inimigos**, sendo **4 aéreos** (drones desde a onda 2; chefes aéreos na Neve).
@@ -28,6 +32,8 @@ Capturas reais do jogo rodando em Chromium headless (1280×800, geradas por
 | Painel Construir com as 6 torres — `kit-construir.png` | Onda com inimigos aéreos — `batalha-aereos.png` |
 | ![Chefe](docs/screenshots/chefe-painel.png) | ![Vitória](docs/screenshots/vitoria.png) |
 | Chefe com barra de vida — `chefe-painel.png` | Tela de vitória — `vitoria.png` |
+| ![iPhone](docs/screenshots/mobile-iphone-batalha.png) | ![iPad](docs/screenshots/mobile-ipad-batalha.png) |
+| iPhone (toque) — `mobile-iphone-batalha.png` | iPad — `mobile-ipad-batalha.png` |
 
 Arquivos individuais: [`menu.png`](docs/screenshots/menu.png) ·
 [`missoes.png`](docs/screenshots/missoes.png) ·
@@ -57,6 +63,29 @@ inexistente e bloqueia tentativas de path traversal (`..`, `%2e%2e`). `/` serve 
 `index.html`. Ele também responde `204` em `/favicon.ico` para o Chromium não
 registrar um `404` de console.
 
+## No PC (Windows) — instalação com atalho
+
+O instalador (sem administrador) copia o jogo para `F:\Jogos\Torre de Ferro`, cria atalho no
+Desktop e no Menu Iniciar e registra a desinstalação em Aplicativos instalados:
+
+```bat
+Instalar Torre de Ferro.cmd
+```
+
+Depois, abra pelo atalho **Torre de Ferro** (Desktop ou Menu Iniciar). O servidor local sobe
+sozinho na porta 8099; a janela minimizada "Torre de Ferro - servidor" mantém o jogo no ar e
+pode ser fechada para parar. Para remover: Menu Iniciar → Torre de Ferro → Desinstalar.
+
+## No celular e no tablet (Android/iPad) — PWA
+
+O jogo está publicado em HTTPS: **https://dshsuperagent-oss.github.io/superagent-sandbox/**
+
+- **Android (Chrome):** abra o link → menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial").
+- **iPad (Safari):** abra o link → botão **Compartilhar** → **Adicionar à Tela de Início**.
+- Depois da primeira visita o jogo abre **offline** (service worker em cache).
+- Controles: **um dedo** gira a câmera, **dois dedos** dão pinça (zoom) e deslocam, **toque** em
+  um slot constrói e em uma torre abre o painel; há botões **−/+** de zoom na barra superior.
+
 ## Controles
 
 | Ação | Controle |
@@ -76,6 +105,8 @@ registrar um `404` de console.
 | Iniciar a próxima onda | `N` (ou botão Iniciar Onda; a preparação também começa sozinha em 25 s) |
 | Ajuda | `H` |
 | Fechar painel / voltar | `Esc` |
+
+No celular/tablet: **um dedo** gira · **dois dedos** dão pinça (zoom) e deslocam · **toque** constrói/seleciona · botões **−/+** também dão zoom.
 
 ## Conteúdo do jogo
 
@@ -156,6 +187,9 @@ games/torre-de-ferro/
 ├── styles.css              # tema escuro, HUD e painéis (pt-BR)
 ├── package.json            # type module, scripts; ZERO dependências
 ├── serve.mjs               # servidor HTTP estático (Node stdlib; 127.0.0.1:8099)
+├── manifest.webmanifest    # PWA: nome, ícones, display standalone
+├── sw.js                   # service worker: cache offline após a 1ª visita
+├── icons/                  # PNGs 192/512 (any + maskable), apple-touch, favicon e .ico
 ├── README.md               # este arquivo
 ├── src/
 │   ├── main.js             # boot, loop, telas, save, handlers da HUD e window.__TD__ (QA)
@@ -177,8 +211,9 @@ games/torre-de-ferro/
 ├── tests/
 │   ├── simulate.mjs        # simulação headless + bot de referência (Deserto/Neve/Cidade)
 │   ├── static-check.mjs    # checagens estáticas + serve.mjs (HTTP 200/404, MIME, no-store)
-│   └── browser-check.mjs   # Chromium headless: joga via __TD__, valida WebGL, captura screenshots
-└── docs/screenshots/       # capturas reais + baseline "antes" do PR
+│   ├── browser-check.mjs   # Chromium headless: joga via __TD__, valida WebGL, captura screenshots
+│   └── mobile-check.mjs    # iPhone/iPad emulados: toque, pinça, construção, PWA e offline
+└── docs/screenshots/       # capturas reais (desktop, iPhone e iPad)
 ```
 
 **Arquitetura em uma frase:** `src/sim/` é pura e determinística, avança em passos
@@ -207,7 +242,16 @@ node tests/browser-check.mjs        # exit 0 — abre Chromium headless e espera
                                     # valida version/maps/enemyTypes/towerTypes/troopTypes, joga o
                                     # Deserto via __TD__, 0 erro de console, 0 request externo, WebGL
                                     # renderizando, telas, save/tutorialDone, áudio/fx e screenshots
+node tests/mobile-check.mjs         # exit 0 (com Playwright) — emula iPhone (390×844) e iPad
+                                    # (1024×768) com TOQUE: menu/tutorial/HUD, painéis, velocidade,
+                                    # mudo, botões −/+, pinça de dois dedos, construção de torre por
+                                    # toque no canvas, manifest+service worker e reload OFFLINE
 ```
+
+Resultados medidos neste ambiente: `simulate` **40/40**, `--completo` **43/43**,
+`browser-check` **26/26**, `mobile-check` **38/38** (iPhone + iPad). A URL pública do
+GitHub Pages também foi validada (iPhone/iPad, manifest, service worker e offline): **20/20**.
+Sem Playwright, `mobile-check` imprime `SKIP` e sai com 0 (como o `browser-check`).
 
 `static-check.mjs` sobe o `serve.mjs` de verdade numa porta livre e confere `200` em
 `/`, `/index.html`, `/styles.css`, `/src/main.js` e no Three.js vendorizado, `404` em
@@ -265,9 +309,15 @@ integrado. Nenhuma imagem de "antes" é versionada neste PR.
   dependências); sem Playwright o teste é `SKIP` e sai com 0. Neste ambiente foi
   possível rodar com o Playwright/Chromium descritos acima.
 - **Sem backend, multijogador, telemetria ou pós-processamento (bloom):** por
-  design do escopo — o jogo é estático e offline após o carregamento.
-- **UI de toque/mobile não é alvo:** os controles são mouse + teclado; telas
-  pequenas podem ficar apertadas (layout otimizado para desktop, 1280×800+).
+  design do escopo — o jogo é estático e, após a primeira visita, funciona **offline**
+  graças ao service worker.
+- **App nativo não incluso:** a instalação em Android/iPad é via **PWA** (HTTPS +
+  "Adicionar à tela inicial"); não há APK/IPA assinado nem publicação em loja. A
+  validação móvel foi feita com **emulação Chromium de iPhone/iPad**; recomenda-se um
+  teste final em aparelho físico (especialmente Safari no iPad) antes de divulgar.
+- **URL pública:** o jogo publicado no GitHub Pages é acessível a quem tiver o link.
+- **Sem vibração/gestos avançados:** o toque cobre girar, pinça/zoom, construir,
+  melhorar/vender e os botões da HUD; não há controles por inclinação do aparelho.
 
 ## Balancete final (divergências da especificação)
 

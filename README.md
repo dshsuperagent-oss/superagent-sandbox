@@ -14,6 +14,10 @@ especiais, áudio 100% sintetizado e save local. WebGL com Three.js vendorizado,
 sem build e sem dependências. Rode `node games/torre-de-ferro/serve.mjs` e abra
 <http://127.0.0.1:8099/>.
 
+Também **instalável como app (PWA)** no Android/iPad e com controles de toque:
+<https://dshsuperagent-oss.github.io/superagent-sandbox/>. No Windows, o instalador com
+atalho no Desktop e Menu Iniciar está no projeto local (`Instalar Torre de Ferro.cmd`).
+
 ![Menu do Torre de Ferro](games/torre-de-ferro/docs/screenshots/menu.png)
 
 ## Editor de mapas mentais (v2)
