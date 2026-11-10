@@ -143,11 +143,13 @@ const REQUIRED_FILES = [
   'tests/browser-check.mjs',
 ];
 
-const TD_API = [
+// Contrato de QA (window.__TD__): 20 métodos + 6 campos de metadados.
+const TD_METHODS = [
   'start', 'state', 'eventLog', 'spawnWave', 'spawnEnemy', 'giveMoney', 'setLives',
   'setSpeed', 'pause', 'resume', 'fastForward', 'buildTower', 'upgradeTower',
   'sellTower', 'deployTroop', 'audioLog', 'fxLog', 'perf', 'win', 'lose',
 ];
+const TD_FIELDS = ['version', 'ready', 'maps', 'enemyTypes', 'towerTypes', 'troopTypes'];
 
 function checkRequiredFiles() {
   const missing = REQUIRED_FILES.filter((rel) => !existsSync(join(GAME_DIR, rel)));
@@ -340,14 +342,115 @@ function checkUiPortuguese() {
   return `texto visível em pt-BR (${text.length} chars analisados)`;
 }
 
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Lê as CHAVES de primeiro nível de um objeto literal `{ ... }` em código JS,
+ * ignorando strings, comentários e corpos aninhados. Retorna Set ou null.
+ * Prova que os nomes estão definidos no objeto de window.__TD__ (e não só
+ * mencionados em qualquer lugar do arquivo).
+ */
+function topLevelKeysOfObjectLiteral(code, openBraceIndex) {
+  if (code[openBraceIndex] !== '{') return null;
+  let i = openBraceIndex + 1;
+  let depth = 0;
+  let expectKey = true;
+  const keys = new Set();
+  const n = code.length;
+  while (i < n) {
+    const ch = code[i];
+    if (ch === '/' && code[i + 1] === '/') {
+      const end = code.indexOf('\n', i);
+      if (end < 0) return null;
+      i = end + 1;
+      continue;
+    }
+    if (ch === '/' && code[i + 1] === '*') {
+      const end = code.indexOf('*/', i + 2);
+      if (end < 0) return null;
+      i = end + 2;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const quote = ch;
+      let j = i + 1;
+      while (j < n) {
+        if (code[j] === '\\') { j += 2; continue; }
+        if (code[j] === quote) break;
+        j += 1;
+      }
+      if (j >= n) return null;
+      if (depth === 0 && expectKey) {
+        const key = code.slice(i + 1, j);
+        let k = j + 1;
+        while (k < n && /\s/.test(code[k])) k += 1;
+        if (code[k] === ':') { keys.add(key); expectKey = false; i = k; continue; }
+      }
+      i = j + 1;
+      continue;
+    }
+    if (ch === '{' || ch === '[' || ch === '(') { depth += 1; i += 1; continue; }
+    if (ch === '}' || ch === ']' || ch === ')') {
+      if (depth === 0) return keys;
+      depth -= 1;
+      i += 1;
+      continue;
+    }
+    if (ch === ',' && depth === 0) { expectKey = true; i += 1; continue; }
+    if (depth === 0 && (ch === '_' || ch === '$' || /[A-Za-z]/.test(ch))) {
+      const m = /^[A-Za-z_$][\w$]*/.exec(code.slice(i, i + 120));
+      if (m) {
+        let token = m[0];
+        let k = i + token.length;
+        const skipSpaces = () => { while (k < n && /\s/.test(code[k])) k += 1; };
+        skipSpaces();
+        if (token === 'async' || token === 'get' || token === 'set') {
+          const m2 = /^[A-Za-z_$][\w$]*/.exec(code.slice(k, k + 120));
+          if (m2) { token = m2[0]; k += token.length; skipSpaces(); }
+        }
+        if (code[k] === ':' || code[k] === '(') {
+          keys.add(token);
+          expectKey = false;
+          i = k; // deixa o loop consumir ':' ou '(' (e o corpo aninhado)
+          continue;
+        }
+        i = k;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  return null;
+}
+
 function checkWindowTd() {
   const mainPath = join(GAME_DIR, 'src/main.js');
   must(existsSync(mainPath), 'src/main.js ausente');
   const code = readText(mainPath);
-  must(/window\.__TD__\s*=/.test(code), 'window.__TD__ não é atribuído em src/main.js');
-  const missing = TD_API.filter((fn) => !new RegExp(`\\b${fn}\\b`).test(code));
-  must(missing.length === 0, `__TD__ sem métodos: ${missing.join(', ')}`);
-  return `window.__TD__ com ${TD_API.length} métodos`;
+  const required = [...TD_METHODS, ...TD_FIELDS];
+  const assignVar = /window\.__TD__\s*=\s*([A-Za-z_$][\w$]*)\s*;/.exec(code);
+  const assignLiteral = /window\.__TD__\s*=\s*\{/.exec(code);
+  let objText = null;
+  let onde = '';
+  if (assignVar) {
+    const varName = assignVar[1];
+    const declRe = new RegExp(`(?:const|let|var)\\s+${escapeRegExp(varName)}\\s*=\\s*\\{`);
+    const decl = declRe.exec(code);
+    must(decl, `window.__TD__ é ${varName}, mas a definição literal de ${varName} não foi encontrada em src/main.js`);
+    objText = topLevelKeysOfObjectLiteral(code, decl.index + decl[0].length - 1);
+    onde = varName;
+  } else {
+    must(assignLiteral, 'window.__TD__ não é atribuído em src/main.js');
+    objText = topLevelKeysOfObjectLiteral(code, assignLiteral.index + assignLiteral[0].length - 1);
+    onde = 'objeto literal';
+  }
+  must(objText, `não foi possível ler a definição de window.__TD__ (${onde}) em src/main.js`);
+  const missing = required.filter((name) => !objText.has(name));
+  must(missing.length === 0,
+    `window.__TD__ (${onde}) em src/main.js não define: ${missing.join(', ')}`);
+  return `definição de window.__TD__ (${onde}) com ${TD_METHODS.length} métodos + ${TD_FIELDS.length} campos (${TD_FIELDS.join(', ')})`;
 }
 
 // ------------------------------------------------------------- serve.mjs

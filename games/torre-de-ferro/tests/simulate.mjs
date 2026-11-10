@@ -271,9 +271,18 @@ check('Custos investidos e venda 70% (floor) por tipo/nível', () => {
     for (let nivel = 1; nivel <= 3; nivel += 1) {
       acumulado += spec.custos[nivel - 1];
       eq(towerInvested(tipo, nivel), acumulado, `${tipo} investido L${nivel}`);
-      eq(sellValue(tipo, nivel), Math.floor(0.7 * acumulado), `${tipo} venda L${nivel}`);
+      eq(sellValue(tipo, nivel), Math.floor((acumulado * 7) / 10), `${tipo} venda L${nivel}`);
     }
   }
+  // BUG-03: aritmética inteira — casos que o ponto flutuante errava em $1.
+  eq(towerInvested('metralhadora', 2), 180, 'investido Metralhadora L2');
+  eq(sellValue('metralhadora', 2), 126, 'venda com aritmética inteira: 180→126 (Metralhadora L2)');
+  eq(towerInvested('missil', 1), 180, 'investido Míssil L1');
+  eq(sellValue('missil', 1), 126, 'venda com aritmética inteira: 180→126 (Míssil L1)');
+  eq(towerInvested('criogenica', 3), 330, 'investido Criogênica L3');
+  eq(sellValue('criogenica', 3), 231, 'venda com aritmética inteira: 330→231 (Criogênica L3)');
+  eq(towerInvested('missil', 2), 330, 'investido Míssil L2');
+  eq(sellValue('missil', 2), 231, 'venda com aritmética inteira: 330→231 (Míssil L2)');
   eq(isCompatible('both', 'air') && isCompatible('both', 'ground'), true, 'both');
   eq(isCompatible('air', 'ground'), false, 'air não mira terrestre');
 });
@@ -519,6 +528,7 @@ check('Torres: construir, melhorar até L3, códigos de erro e venda 70%', () =>
   eq(t.level, 2, 'nível 2');
   eq(t.damage, 22, 'dano L2');
   eq(engine.getState().money, 170, 'dinheiro após L2');
+  eq(t.sellValue, 126, 'venda L2 (180 investido) com aritmética inteira');
   ok(engine.upgradeTower(t.id), 'upgrade L3');
   t = engine.getState().towers[0];
   eq(t.level, 3, 'nível 3');

@@ -185,8 +185,12 @@ export function towerInvested(type, level) {
   return total;
 }
 
+// Venda = floor(0,7 × total investido), em aritmética INTEIRA (a spec manda
+// floor(0,7×investido); com ponto flutuante 0,7×180 dava 125 e 0,7×330 dava
+// 230 — $1 a menos nas combinações de investido 180 e 330). Correção de
+// arredondamento, não é balanceamento.
 export function sellValue(type, level) {
-  return Math.floor(SELL_RATE * towerInvested(type, level));
+  return Math.floor((towerInvested(type, level) * 7) / 10);
 }
 
 // ---------------------------------------------------------------- save

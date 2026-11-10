@@ -199,12 +199,14 @@ node tests/simulate.mjs --completo  # < 60 s, exit 0 — bot vence os 3 mapas
                                     # (Deserto 20, Neve 8, Cidade 7 vidas)
 node tests/static-check.mjs         # exit 0 — arquivos da arquitetura, Three.js > 500 KB + LICENSE,
                                     # zero URL externa, zero mídia, imports resolvem, node --check,
-                                    # UI pt-BR, window.__TD__, HTTP 200/404 do serve.mjs (MIME/no-store),
-                                    # sem node_modules e nenhum arquivo alterado fora do escopo
+                                    # UI pt-BR, DEFINIÇÃO de window.__TD__ (20 métodos + 6 campos de QA),
+                                    # HTTP 200/404 do serve.mjs (MIME/no-store), sem node_modules e
+                                    # nenhum arquivo alterado fora do escopo
 node serve.mjs                      # imprime http://127.0.0.1:8099/ e responde 200
-node tests/browser-check.mjs        # exit 0 — abre Chromium headless, joga o Deserto via __TD__,
-                                    # valida 0 erro de console, 0 request externo, WebGL renderizando,
-                                    # telas, save/tutorialDone, áudio/fx/eventos e captura os screenshots
+node tests/browser-check.mjs        # exit 0 — abre Chromium headless e espera __TD__.ready===true,
+                                    # valida version/maps/enemyTypes/towerTypes/troopTypes, joga o
+                                    # Deserto via __TD__, 0 erro de console, 0 request externo, WebGL
+                                    # renderizando, telas, save/tutorialDone, áudio/fx e screenshots
 ```
 
 `static-check.mjs` sobe o `serve.mjs` de verdade numa porta livre e confere `200` em
@@ -223,12 +225,6 @@ CHROMIUM_PATH=/root/.cache/ms-playwright/chromium-1134/chrome-linux/chrome \
 node tests/browser-check.mjs
 ```
 
-Para recapturar a evidência "antes" do PR (página inexistente no `main`):
-
-```bash
-node tests/browser-check.mjs --antes   # extrai origin/main p/ tmp, serve e captura
-                                       # docs/screenshots/antes-404.png (HTTP 404)
-```
 
 ## Origem e versão do Three.js
 
@@ -243,12 +239,11 @@ node tests/browser-check.mjs --antes   # extrai origin/main p/ tmp, serve e capt
 
 ## Evidência antes/depois do PR
 
-Como o jogo é uma pasta nova dentro de `games/`, o "antes" é simplesmente a página
-não existir no `main`: servindo a árvore do `main` e abrindo
-`/games/torre-de-ferro/`, a resposta é **HTTP 404** (ver
-[`docs/screenshots/antes-404.png`](docs/screenshots/antes-404.png)). O "depois" são
-as telas reais do jogo listadas no topo deste README, capturadas pelo
-`browser-check.mjs` no jogo integrado.
+O "antes" é medido no `main` de baseline (**commit `a295066`**, anterior a este PR):
+servindo aquela árvore e abrindo `/games/torre-de-ferro/`, a resposta é **HTTP 404
+real** — a pasta do jogo não existe no `main`. O "depois" são as telas reais do jogo
+listadas no topo deste README, capturadas pelo `browser-check.mjs` no jogo
+integrado. Nenhuma imagem de "antes" é versionada neste PR.
 
 ## Limitações honestas
 
@@ -344,6 +339,16 @@ BOT neve:    vitória=true vidas=8  onda=16 kills=101 vazamentos=12
 BOT cidade:  vitória=true vidas=7  onda=24 kills=144 vazamentos=3
 ```
 
+### Correção de arredondamento na venda (não é balanceamento)
+
+A especificação manda venda = `floor(0,7 × total investido)`. A conta foi
+padronizada em aritmética inteira (`floor(investido × 7 / 10)`) para eliminar erro
+de ponto flutuante que devolvia $1 a menos em quatro combinações: Metralhadora L2 e
+Míssil L1 (investido 180: 125 → **126**) e Criogênica L3 e Míssil L2 (investido 330:
+230 → **231**). Os demais níveis não mudam (ex.: 100 → 70, 320 → 224). O
+`state.sellValue` do engine e o botão "Vender +$" do HUD já leem esse valor. É
+correção de arredondamento, não divergência de balanceamento.
+
 ## API de QA (`window.__TD__`)
 
 Página de jogo expõe uma API para testes automatizados e depuração no console:
@@ -354,6 +359,12 @@ giveMoney(v), setLives(v), setSpeed(1|2), pause(), resume(), fastForward(s),
 buildTower(slot,type), upgradeTower(id), sellTower(id), deployTroop(type,point),
 audioLog(n), fxLog(n), perf(), win(), lose()
 ```
+
+Campos de metadados (somente leitura): `version` (string, ex.: `"1.0.0"`),
+`ready` (boolean — `false` durante o boot e `true` depois do primeiro frame
+renderizado), `maps` (`['deserto','neve','cidade']`), `enemyTypes` (10 tipos),
+`towerTypes` (6 tipos) e `troopTypes` (3 tipos). O `browser-check.mjs` espera
+`window.__TD__.ready === true` e valida os seis campos antes do fluxo.
 
 `state()` devolve um snapshot serializável (JSON) com mapa, onda, fase, economia,
 inimigos, torres, tropas, projéteis, slots, pontos de tropa, estatísticas e chefe.

@@ -5,7 +5,7 @@
 
 import {
   STEP, START_MONEY, START_MONEY_PER_MAP, START_LIVES, SAVE_KEY, MAP_ORDER, MAP_NAMES,
-  starsForLives, applyVictory, validateSave, createDefaultSave, TOWERS,
+  starsForLives, applyVictory, validateSave, createDefaultSave, TOWERS, ENEMIES, TROOP_ORDER,
 } from './sim/data.js';
 import { DEFAULT_SEED } from './sim/rng.js';
 import { getMap } from './sim/maps.js';
@@ -594,6 +594,10 @@ function loop(agora) {
   chamarFx('update', dt);
   chamarAudio('update', dt);
   app.scene.render();
+
+  // Boot completo: primeiro frame renderizado com cena, HUD e loop prontos.
+  const td = window.__TD__;
+  if (td && td.ready !== true) td.ready = true;
 }
 
 // ------------------------------------------------------------------ teclado
@@ -679,6 +683,13 @@ function criarHandlers() {
 
 function instalarTD() {
   const TD = {
+    // Contrato de QA exigido pela issue #18 / DESIGN §15.2 (campos + métodos).
+    version: '1.0.0',
+    ready: false,
+    maps: MAP_ORDER.slice(),
+    enemyTypes: Object.keys(ENEMIES),
+    towerTypes: Object.keys(TOWERS),
+    troopTypes: TROOP_ORDER.slice(),
     start(opcoes) {
       iniciarPartida((opcoes && opcoes.mapId) || 'deserto', opcoes || {});
       return true;

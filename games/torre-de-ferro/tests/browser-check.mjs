@@ -5,8 +5,6 @@
 //   node tests/browser-check.mjs          # joga o jogo em Chromium headless, valida e
 //                                         # captura docs/screenshots/{menu,missoes,kit-construir,
 //                                         # batalha-aereos,chefe-painel,vitoria,derrota}.png
-//   node tests/browser-check.mjs --antes   # captura docs/screenshots/antes-404.png servindo o
-//                                         # origin/main (pré-PR): /games/torre-de-ferro/ => 404
 //
 // Playwright é opcional: procura 'playwright'/'playwright-core' (import dinâmico, require com
 // NODE_PATH, PLAYWRIGHT_PATH e o caminho padrão /tmp/pw/node_modules). Sem ele:
@@ -15,17 +13,15 @@
 //
 // Regra de ouro: NUNCA marcar PASS sem executar. Falhou => exit 1 com a mensagem exata.
 
-import { readFileSync, existsSync, mkdirSync, unlinkSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { spawn, spawnSync, execSync } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import net from 'node:net';
 
 const GAME_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const REPO_ROOT = resolve(GAME_DIR, '..', '..');
 const SHOTS_DIR = join(GAME_DIR, 'docs/screenshots');
 const VIEWPORT = { width: 1280, height: 800 };
 const BROWSER_ARGS = [
@@ -465,13 +461,49 @@ async function runGameChecks(page, origin) {
     await waitVisible(page, '#screen-menu.active', 20000);
     const title = await page.title();
     if (!/Torre de Ferro/i.test(title)) throw new Error(`title inesperado: "${title}"`);
-    await waitFor(page, () => Boolean(window.__TD__ && typeof window.__TD__.state === 'function'), 20000);
+    // O contrato de QA exige a API pronta antes de qualquer fluxo.
+    await waitFor(page, () => Boolean(window.__TD__
+      && typeof window.__TD__.state === 'function'
+      && window.__TD__.ready === true), 25000);
     const api = await page.evaluate(() => Object.keys(window.__TD__).sort());
     const falta = ['start', 'state', 'eventLog', 'spawnWave', 'spawnEnemy', 'giveMoney', 'setLives',
       'setSpeed', 'pause', 'resume', 'fastForward', 'buildTower', 'upgradeTower', 'sellTower',
       'deployTroop', 'audioLog', 'fxLog', 'perf', 'win', 'lose'].filter((k) => !api.includes(k));
     if (falta.length) throw new Error(`__TD__ sem: ${falta.join(', ')}`);
-    return `${api.length} métodos de QA, title "${title}"`;
+    return `${api.length} chaves de QA, title "${title}"`;
+  });
+  await step('__TD__ pronto: ready=true + version/maps/enemyTypes/towerTypes/troopTypes', async () => {
+    const meta = await page.evaluate(() => {
+      const td = window.__TD__ || {};
+      const arr = (v) => Array.isArray(v) && v.length > 0;
+      return {
+        version: td.version,
+        ready: td.ready,
+        maps: arr(td.maps) ? td.maps.slice() : null,
+        enemyTypes: arr(td.enemyTypes) ? td.enemyTypes.slice() : null,
+        towerTypes: arr(td.towerTypes) ? td.towerTypes.slice() : null,
+        troopTypes: arr(td.troopTypes) ? td.troopTypes.slice() : null,
+      };
+    });
+    const problemas = [];
+    if (typeof meta.version !== 'string' || meta.version.trim().length === 0) problemas.push('version ausente/vazia (string esperada)');
+    if (meta.ready !== true) problemas.push('ready !== true');
+    for (const campo of ['maps', 'enemyTypes', 'towerTypes', 'troopTypes']) {
+      if (!meta[campo]) problemas.push(`${campo} ausente/vazio (array esperado)`);
+    }
+    if (problemas.length) throw new Error(problemas.join('; '));
+    const esperado = {
+      maps: ['deserto', 'neve', 'cidade'],
+      enemyTypes: ['soldado', 'blindado', 'tanque', 'drone', 'helicoptero', 'bombardeiro',
+        'zepelim', 'chefe-deserto', 'chefe-neve', 'chefe-cidade'],
+      towerTypes: ['metralhadora', 'antiaereo', 'morteiro', 'tesla', 'criogenica', 'missil'],
+      troopTypes: ['fuzileiros', 'antiaerea', 'sniper'],
+    };
+    for (const [campo, lista] of Object.entries(esperado)) {
+      const faltando = lista.filter((v) => !meta[campo].includes(v));
+      if (faltando.length) throw new Error(`${campo} sem: ${faltando.join(', ')}`);
+    }
+    return `version="${meta.version}", ready=true, maps=${meta.maps.length}, enemyTypes=${meta.enemyTypes.length}, towerTypes=${meta.towerTypes.length}, troopTypes=${meta.troopTypes.length}`;
   });
   await step('screenshot menu.png real 1280x800', async () => {
     const s = await capture(page, 'menu.png');
@@ -611,7 +643,8 @@ async function runGameChecks(page, origin) {
     if (st.money > caixaAntesMelhorar - 80) throw new Error(`melhorar não debitou 80 (${caixaAntesMelhorar} → ${st.money})`);
     const caixaAntesVender = st.money;
     const torreVendida = st.towers[0];
-    const vendaEsperada = Math.floor(0.7 * torreVendida.invested);
+    // Mesma fórmula da spec/engine: aritmética inteira (floor(investido × 7 / 10)).
+    const vendaEsperada = Math.floor((torreVendida.invested * 7) / 10);
     await page.click('#btn-vender');
     await waitFor(page, () => window.__TD__.state().towers.length === 0, 10000);
     st = await td(page, 'state');
@@ -824,79 +857,6 @@ async function runGameChecks(page, origin) {
   });
 }
 
-// ------------------------------------------------------------------ captura "antes" (origin/main)
-
-async function extractOriginMain(tmp) {
-  const archive = spawnSync('git', ['-C', REPO_ROOT, 'archive', 'origin/main'], {
-    maxBuffer: 1024 * 1024 * 1024,
-  });
-  if (archive.status !== 0) {
-    throw new Error(`git archive origin/main falhou: ${String(archive.stderr || '').trim().slice(0, 300)}`);
-  }
-  const extract = spawnSync('tar', ['-x', '-C', tmp], { input: archive.stdout });
-  if (extract.status !== 0) {
-    throw new Error(`tar -x falhou: ${String(extract.stderr || '').trim().slice(0, 300)}`);
-  }
-}
-
-async function runBaselineCheck() {
-  console.log('browser-check --antes — baseline do PR (página 404 no main)');
-  const pw = await resolvePlaywright();
-  if (!pw.chromium) {
-    console.log(`SKIP: playwright indisponível (${pw.attempts.join('; ')})`);
-    process.exitCode = 0;
-    return;
-  }
-  let browser = null;
-  let server = null;
-  let tmp = null;
-  try {
-    const exe = findChromium();
-    browser = await pw.chromium.launch({ headless: true, executablePath: exe, args: BROWSER_ARGS });
-    const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-    const page = await context.newPage();
-    const consoleErrors = [];
-    page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
-    page.on('pageerror', (e) => consoleErrors.push(String(e)));
-
-    tmp = mkdtempSync(join(tmpdir(), 'td-antes-'));
-    await step('extrai origin/main (pré-PR) sem a pasta do jogo', async () => {
-      await extractOriginMain(tmp);
-      if (existsSync(join(tmp, 'games/torre-de-ferro'))) throw new Error('origin/main já contém games/torre-de-ferro — baseline inválido');
-      if (!existsSync(join(tmp, 'README.md'))) throw new Error('origin/main sem README.md');
-      return 'git archive origin/main extraído em tmp';
-    });
-    const mod = await import(pathToFileURL(join(GAME_DIR, 'serve.mjs')).href);
-    await step('serve.mjs serve a árvore do main e /games/torre-de-ferro/ responde 404', async () => {
-      server = mod.createStaticServer(tmp);
-      const port = await mod.listen(server, 0);
-      const resp = await page.goto(`http://127.0.0.1:${port}/games/torre-de-ferro/`, { waitUntil: 'load', timeout: 20000 });
-      if (!resp) throw new Error('navegação sem resposta HTTP');
-      if (resp.status() !== 404) throw new Error(`status ${resp.status()}, esperado 404`);
-      const body = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim());
-      if (!/404/.test(body)) throw new Error(`corpo sem "404": ${body.slice(0, 120)}`);
-      return `HTTP 404 em 127.0.0.1:${port}/games/torre-de-ferro/ ("${body.slice(0, 60)}")`;
-    });
-    await step('screenshot antes-404.png real 1280x800', async () => {
-      const s = await capture(page, 'antes-404.png');
-      return `${(s.size / 1024).toFixed(0)} KB, std=${s.stddev.toFixed(1)}`;
-    });
-    await step('baseline sem erro de JS na página', async () => {
-      // O documento 404 gera um console.error de rede ("Failed to load resource") — esperado.
-      const inesperados = consoleErrors.filter((txt) => !/Failed to load resource/i.test(txt));
-      if (inesperados.length) throw new Error(`console.error inesperado: ${inesperados.slice(0, 3).join(' | ')}`);
-      return 'só o 404 esperado (sem erro de JS)';
-    });
-  } catch (err) {
-    fail('baseline (--antes)', err && err.message ? err.message : String(err));
-  } finally {
-    await closeBrowserBounded(browser);
-    if (server) { if (typeof server.closeAllConnections === 'function') server.closeAllConnections(); server.close(); }
-    if (tmp) rmSync(tmp, { recursive: true, force: true });
-  }
-  finish();
-}
-
 // ------------------------------------------------------------------ execução principal
 
 async function runGameHarness() {
@@ -969,9 +929,7 @@ function finish() {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--antes')) await runBaselineCheck();
-  else await runGameHarness();
+  await runGameHarness();
 }
 
 main().catch((err) => {
