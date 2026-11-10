@@ -5,6 +5,17 @@ Repo sandbox para testes do dsh-superagent (nao usar para trabalho real)
 ## Sobre
 Este repositorio e um sandbox de testes do dsh-superagent.
 
+## Torre de Ferro — Defesa do Último Posto
+
+Jogo 3D de defesa de torre no navegador, em pt-BR, em
+[`games/torre-de-ferro/`](games/torre-de-ferro/README.md): 3 setores × 8 ondas,
+10 inimigos (4 aéreos, chefes nas ondas 8/16/24), 6 torres com 3 níveis, 3 tropas
+especiais, áudio 100% sintetizado e save local. WebGL com Three.js vendorizado,
+sem build e sem dependências. Rode `node games/torre-de-ferro/serve.mjs` e abra
+<http://127.0.0.1:8099/>.
+
+![Menu do Torre de Ferro](games/torre-de-ferro/docs/screenshots/menu.png)
+
 ## Editor de mapas mentais (v2)
 
 Editor de mapas mentais em **arquivo único**: [`index.html`](index.html) reúne
