@@ -790,6 +790,24 @@ function instalarTD() {
         phase: estado ? estado.phase : null,
       };
     },
+    zoomBy(fator) {
+      if (!app.scene || typeof app.scene.zoomBy !== 'function') return null;
+      return app.scene.zoomBy(Number(fator));
+    },
+    view() {
+      if (!app.scene || typeof app.scene.viewInfo !== 'function') return null;
+      return app.scene.viewInfo();
+    },
+    projectSlot(indice) {
+      // Coordenada de tela de um slot (usada pelos testes de toque).
+      const estado = app.engine ? app.engine.getState() : null;
+      if (!estado || !app.scene || typeof app.scene.project !== 'function') return null;
+      const alvo = Number(indice);
+      const slot = estado.slots.find((s) => Number(s.i) === alvo);
+      if (!slot) return null;
+      const p = app.scene.project(slot.x, 0, slot.z);
+      return { x: p.x, y: p.y, visible: p.visible, slot: alvo };
+    },
     win() {
       if (app.engine && typeof app.engine.forceWin === 'function') app.engine.forceWin();
       return true;
@@ -809,6 +827,19 @@ function desbloquearAudio() {
     app.audio.unlock();
   } catch (err) {
     // áudio indisponível não pode quebrar o jogo
+  }
+}
+
+// PWA: permite instalar na tela inicial (Android/iPad) e jogar offline após a 1ª visita.
+function registrarServiceWorker() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (typeof location !== 'undefined' && location.protocol === 'file:') return;
+  try {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* offline é opcional: sem SW o jogo continua funcionando online */
+    });
+  } catch (err) {
+    /* idem */
   }
 }
 
@@ -838,6 +869,15 @@ function iniciar() {
   window.addEventListener('keydown', desbloquear);
 
   instalarTD();
+
+  // Zoom por botões (útil no toque; a pinça no canvas também funciona).
+  // Aproximar = reduzir a distância da câmera.
+  const btnZoomMais = el('btn-zoom-mais');
+  const btnZoomMenos = el('btn-zoom-menos');
+  if (btnZoomMais) btnZoomMais.addEventListener('click', () => app.scene.zoomBy(0.8));
+  if (btnZoomMenos) btnZoomMenos.addEventListener('click', () => app.scene.zoomBy(1.25));
+
+  registrarServiceWorker();
 
   app.last = performance.now();
   window.requestAnimationFrame(loop);

@@ -230,6 +230,9 @@ export function createScene({ canvas, onPick, onHover } = {}) {
     lastY: 0,
     moved: 0,
   };
+  // Toque: até dois ponteiros — um dedo orbita/desloca, dois dedos dão pinça (zoom) e pan.
+  const pointers = new Map();
+  let pinchState = null;
   let lastPickAt = 0;
   let disposed = false;
 
@@ -252,7 +255,10 @@ export function createScene({ canvas, onPick, onHover } = {}) {
 
   function resize() {
     const { w, h } = canvasSize();
-    const dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
+    const coarse = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches;
+    // Em telas de toque, limitar o DPR poupa bateria/GPU sem perder legibilidade.
+    const dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, coarse ? 1.5 : 2);
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
@@ -335,26 +341,58 @@ export function createScene({ canvas, onPick, onHover } = {}) {
   }
 
   function onPointerDown(ev) {
-    if (ev.button !== 0 && ev.button !== 2) return;
-    controls.pointerId = ev.pointerId;
-    controls.button = ev.button;
-    controls.dragging = true;
-    controls.moved = 0;
-    controls.downX = ev.clientX;
-    controls.downY = ev.clientY;
-    controls.lastX = ev.clientX;
-    controls.lastY = ev.clientY;
-    try {
-      canvas.setPointerCapture(ev.pointerId);
-    } catch (err) {
-      /* captura opcional */
+    if (ev.button !== 0 && ev.button !== 2 && ev.pointerType !== 'touch') return;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size === 1) {
+      controls.pointerId = ev.pointerId;
+      controls.button = ev.button;
+      controls.dragging = true;
+      controls.moved = 0;
+      controls.downX = ev.clientX;
+      controls.downY = ev.clientY;
+      controls.lastX = ev.clientX;
+      controls.lastY = ev.clientY;
+      try {
+        canvas.setPointerCapture(ev.pointerId);
+      } catch (err) {
+        /* captura opcional */
+      }
+    } else if (pointers.size === 2) {
+      // Segundo dedo: cancela o toque simples e entra em modo pinça/pan.
+      const pts = Array.from(pointers.values());
+      pinchState = {
+        dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        midX: (pts[0].x + pts[1].x) / 2,
+        midY: (pts[0].y + pts[1].y) / 2,
+      };
+      controls.dragging = false;
+      controls.pointerId = null;
+      controls.moved = 999;
+      hoverPick = { slot: null, point: null };
+      hoverRing.visible = false;
+      canvas.style.cursor = '';
     }
     ev.preventDefault();
   }
 
   function onPointerMove(ev) {
+    if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pointers.size >= 2 && pinchState) {
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      if (dist > 1 && pinchState.dist > 1) {
+        view.distance = clamp(view.distance * (pinchState.dist / dist), view.minDistance, view.maxDistance);
+      }
+      panByPixels(midX - pinchState.midX, midY - pinchState.midY);
+      pinchState = { dist, midX, midY };
+      applyCamera();
+      ev.preventDefault();
+      return;
+    }
     if (!controls.dragging || ev.pointerId !== controls.pointerId) {
-      if (!controls.dragging) updateHover(ev.clientX, ev.clientY);
+      if (!controls.dragging && ev.pointerType === 'mouse') updateHover(ev.clientX, ev.clientY);
       return;
     }
     const dx = ev.clientX - controls.lastX;
@@ -398,14 +436,20 @@ export function createScene({ canvas, onPick, onHover } = {}) {
   }
 
   function onPointerUp(ev) {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchState = null;
     finishPointer(ev, false);
   }
 
   function onPointerCancel(ev) {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchState = null;
     finishPointer(ev, true);
   }
 
   function onPointerLeave(ev) {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchState = null;
     if (controls.dragging) return;
     if (hoverPick.slot !== null || hoverPick.point !== null) {
       hoverPick = { slot: null, point: null };
@@ -427,6 +471,19 @@ export function createScene({ canvas, onPick, onHover } = {}) {
     ev.preventDefault();
     view.distance = clamp(view.distance * Math.exp((ev.deltaY || 0) * 0.0012), view.minDistance, view.maxDistance);
     applyCamera();
+  }
+
+  // Zoom programático (botões de toque e testes): fator > 1 aproxima.
+  function zoomBy(factor) {
+    const f = Number(factor);
+    if (!Number.isFinite(f) || f <= 0) return view.distance;
+    view.distance = clamp(view.distance * f, view.minDistance, view.maxDistance);
+    applyCamera();
+    return view.distance;
+  }
+
+  function viewInfo() {
+    return { yaw: view.yaw, polar: view.polar, distance: view.distance, min: view.minDistance, max: view.maxDistance };
   }
 
   function onContextMenu(ev) {
@@ -1416,6 +1473,8 @@ export function createScene({ canvas, onPick, onHover } = {}) {
     resize,
     render,
     perf,
+    zoomBy,
+    viewInfo,
     dispose,
   };
 }

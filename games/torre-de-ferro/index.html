@@ -2,9 +2,17 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0a0c11" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Torre de Ferro" />
   <title>Torre de Ferro — Defesa do Último Posto</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -59,6 +67,8 @@
         <div class="hud-botoes">
           <button id="btn-onda" class="botao botao--onda" type="button">Iniciar Onda</button>
           <button id="btn-tropas" class="botao botao--hud" type="button">Tropas</button>
+          <button id="btn-zoom-menos" class="botao botao--hud so-toque" type="button" aria-label="Afastar câmera" title="Afastar">−</button>
+          <button id="btn-zoom-mais" class="botao botao--hud so-toque" type="button" aria-label="Aproximar câmera" title="Aproximar">+</button>
           <button id="btn-velocidade" class="botao botao--hud" type="button" title="Alternar velocidade (F)">1x</button>
           <button id="btn-pausa" class="botao botao--hud" type="button" title="Pausar (Espaço)">Pausar</button>
           <button id="btn-mudo" class="botao botao--hud" type="button" title="Som (M)">Som</button>
@@ -77,6 +87,7 @@
       </div>
 
       <p id="dica-campo" class="dica-campo">Clique em um slot vazio para construir · clique em uma torre para melhorar</p>
+      <p id="dica-toque" class="dica-toque so-toque">Toque em um slot para construir · arraste para girar · pinça para zoom</p>
 
       <!-- Painel construir -->
       <div id="painel-construir" class="painel-flutuante painel-construir" hidden>
@@ -250,6 +261,15 @@
             </ul>
           </div>
         </div>
+        <div class="ajuda-movel so-toque">
+          <h3>No celular e no tablet</h3>
+          <ul class="lista-ajuda">
+            <li><strong>Um dedo arrastado</strong> gira a câmera · <strong>dois dedos</strong> dão pinça (zoom) e deslocam</li>
+            <li><strong>Toque</strong> em um slot vazio para construir · toque numa torre para melhorar ou vender</li>
+            <li>Os botões <strong>−</strong> e <strong>+</strong> na barra superior também aproximam e afastam</li>
+            <li><strong>Instalar como app:</strong> no Android/Chrome use o menu → "Instalar app"; no iPad/Safari use Compartilhar → "Adicionar à Tela de Início"</li>
+          </ul>
+        </div>
         <div class="painel-acoes">
           <button id="btn-fechar-ajuda" class="botao botao--forte" type="button">Fechar</button>
         </div>
@@ -272,6 +292,14 @@
           <li><strong>Espaço</strong> pausa · <strong>M</strong> silencia</li>
           <li><strong>H</strong> ajuda · <strong>Esc</strong> fecha painéis</li>
         </ul>
+        <div class="ajuda-movel so-toque">
+          <h3>No celular e no tablet</h3>
+          <ul class="lista-ajuda">
+            <li><strong>Arraste um dedo</strong> para girar · <strong>pinça</strong> para zoom · <strong>dois dedos</strong> para deslocar</li>
+            <li><strong>Toque</strong> no slot para construir e na torre para melhorar/vender</li>
+            <li><strong>Instalar como app:</strong> Android/Chrome → menu "Instalar app"; iPad/Safari → Compartilhar → "Adicionar à Tela de Início"</li>
+          </ul>
+        </div>
         <div class="painel-acoes">
           <button id="btn-fechar-controles" class="botao botao--forte" type="button">Voltar</button>
         </div>

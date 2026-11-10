@@ -8,6 +8,7 @@
     "start": "node serve.mjs",
     "test": "node tests/simulate.mjs && node tests/static-check.mjs",
     "test:completo": "node tests/simulate.mjs --completo",
-    "test:browser": "node tests/browser-check.mjs"
+    "test:browser": "node tests/browser-check.mjs",
+    "test:mobile": "node tests/mobile-check.mjs"
   }
 }

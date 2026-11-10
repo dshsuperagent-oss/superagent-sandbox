@@ -419,6 +419,77 @@ html, body {
   .menu-painel { padding: 1.6rem 1.1rem; }
 }
 
+/* ------------------------------------------------ toque / celular / tablet */
+.so-toque { display: none; }
+.dica-toque {
+  display: none;
+  position: absolute;
+  bottom: calc(0.55rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  border-radius: 8px;
+  background: rgba(10, 13, 18, 0.7);
+  color: #a9b4c6;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 11;
+}
+
+@media (pointer: coarse) {
+  .so-toque { display: inline-flex; }
+  .ajuda-movel { display: block; }
+  .dica-campo { display: none; }
+  .dica-toque { display: block; }
+  #cena { cursor: default; }
+  .botao { min-height: 44px; }
+  .botao--hud { min-height: 42px; padding: 0.55rem 0.72rem; }
+  .torre-tecla { display: none; }
+  .torre-card, .tropa-card { min-height: 52px; }
+}
+
+@media (max-width: 700px) {
+  .hud-topo {
+    top: calc(0.4rem + env(safe-area-inset-top));
+    left: calc(0.45rem + env(safe-area-inset-left));
+    right: calc(0.45rem + env(safe-area-inset-right));
+    gap: 0.35rem;
+  }
+  .hud-recurso { padding: 0.35rem 0.55rem; font-size: 0.86rem; }
+  .hud-botoes { width: 100%; margin-left: 0; justify-content: flex-end; gap: 0.3rem; }
+  .botao--hud { padding: 0.45rem 0.55rem; font-size: 0.8rem; }
+  .chefe-barra { top: calc(6.4rem + env(safe-area-inset-top)); width: min(520px, 92vw); }
+  .alerta-chefe { top: 30%; width: 86vw; padding: 0.7rem 1rem; }
+  .tutorial { bottom: calc(0.6rem + env(safe-area-inset-bottom)); width: 94vw; }
+  .tutorial-caixa { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .tutorial-texto { font-size: 0.88rem; }
+  .toast { bottom: calc(4.6rem + env(safe-area-inset-bottom)); max-width: 92vw; text-align: center; }
+  .menu-painel { padding: 1.4rem 1rem; border-radius: 14px; }
+  .menu-selo { width: 52px; height: 52px; font-size: 1.6rem; }
+  .painel { padding: 1.2rem 1rem; max-height: 92vh; }
+  .painel h2 { font-size: 1.35rem; }
+  .map-list { grid-template-columns: 1fr; }
+  .map-card { padding: 0.8rem; }
+  .painel-flutuante { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom)); left: 0.5rem; right: 0.5rem; width: auto; max-height: 52vh; padding: 0.8rem; }
+  .painel-flutuante h3 { font-size: 1rem; }
+  .dica-toque { bottom: calc(0.6rem + env(safe-area-inset-bottom)); max-width: 94vw; overflow: hidden; text-overflow: ellipsis; }
+  .ajuda-movel { margin-top: 0.9rem; }
+  .ajuda-movel h3 { margin: 0.2rem 0 0.4rem; color: var(--texto); font-size: 0.95rem; }
+  .lista-ajuda { font-size: 0.84rem; line-height: 1.6; }
+  .painel-acoes .botao { flex: 1 1 auto; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .hud-topo { flex-wrap: nowrap; overflow-x: auto; }
+  .hud-botoes { width: auto; margin-left: auto; flex-wrap: nowrap; }
+  .painel-flutuante { top: 0.4rem; bottom: auto; max-height: 82vh; width: min(320px, 46vw); }
+  .tutorial { bottom: 0.3rem; width: min(520px, 62vw); }
+  .dica-toque { display: none; }
+  .chefe-barra { top: 0.4rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .alerta-chefe { animation: none; }
   .botao { transition: none; }

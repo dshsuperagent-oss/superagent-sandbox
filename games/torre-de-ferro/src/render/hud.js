@@ -16,6 +16,19 @@ const SCREENS = [
   ['controls', 'screen-controls'],
 ];
 
+// Em telas de toque, os textos falam "toque" em vez de "clique".
+const TOQUE = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  && window.matchMedia('(pointer: coarse)').matches;
+
+function falar(texto) {
+  if (!TOQUE) return texto;
+  return texto
+    .replace(/\bClique\b/g, 'Toque')
+    .replace(/\bclique\b/g, 'toque')
+    .replace(/\s·\sEsc fecha o painel/g, ' · use Fechar para sair')
+    .replace(/\s·\sV vende a torre\s·\sEsc fecha/g, ' · V vende a torre');
+}
+
 // Textos do tutorial de 6 passos (Deserto, onda 1).
 export const TUTORIAL_STEPS = [
   'Bem-vindo ao último posto, comandante! Construa torres nos círculos claros ao lado do caminho.',
@@ -24,7 +37,7 @@ export const TUTORIAL_STEPS = [
   'Clique em uma torre para abrir o painel e melhorá-la: mais dano, alcance e cadência.',
   'Posicione tropas especiais nos pontos marcados. Fuzileiros bloqueiam inimigos terrestres.',
   'Sobreviva às 8 ondas do setor. Chefes são resistentes: concentre o fogo e proteja a base!',
-];
+].map(falar);
 
 const ALVO_NOME = {
   both: 'terrestre e aéreo',
@@ -338,7 +351,8 @@ export function createHud({ handlers = {} } = {}) {
 
   function updateDica(state, ui) {
     const dica = el('dica-campo');
-    if (!dica) return;
+    const dicaToque = el('dica-toque');
+    if (!dica && !dicaToque) return;
     let texto = 'Clique em um slot vazio para construir · clique em uma torre para melhorar';
     if (ui.panel === 'construir') {
       texto = 'Escolha uma torre · Esc fecha o painel';
@@ -350,7 +364,8 @@ export function createHud({ handlers = {} } = {}) {
     if (ui.deployTipo && TROOPS[ui.deployTipo]) {
       texto = `Clique em um ponto de tropa livre para posicionar: ${TROOPS[ui.deployTipo].name}`;
     }
-    setText(dica, texto);
+    if (dica) setText(dica, texto);
+    if (dicaToque) setText(dicaToque, falar(texto));
   }
 
   // --------------------------------------------------------------- painéis

@@ -210,6 +210,9 @@ function checkNoExternalUrls() {
 function checkNoMediaAssets() {
   const offenders = [];
   const mediaRe = /\.(?:mp3|wav|ogg|png|jpe?g|gif|webp|gltf|glb)\b/gi;
+  // Ícones locais do PWA (manifest.js/apple-touch-icon) são permitidos:
+  // são PNGs pequenos, versionados no repo, sem CDN e essenciais para instalar o app.
+  const iconePwa = /(?:^|["'\s(])\.?\/?icons\/[\w.-]+\.png\b/i;
   const files = [
     join(GAME_DIR, 'index.html'),
     ...walkFiles(join(GAME_DIR, 'src'), { skipDirs: ['vendor', 'node_modules'] }).filter((f) => /\.(?:js|mjs|css)$/i.test(f)),
@@ -218,11 +221,13 @@ function checkNoMediaAssets() {
     const lines = readText(file).split('\n');
     lines.forEach((line, i) => {
       const matches = line.match(mediaRe);
-      if (matches) offenders.push(`${relToGame(file)}:${i + 1} (${matches[0]})`);
+      if (!matches) return;
+      if (iconePwa.test(line) && !/https?:\/\//i.test(line)) return;
+      offenders.push(`${relToGame(file)}:${i + 1} (${matches[0]})`);
     });
   }
   must(offenders.length === 0, `mídia externa/arquivo de mídia referenciado: ${offenders.slice(0, 6).join('; ')}`);
-  return `${files.length} arquivos sem mídia externa (docs/screenshots/ é a exceção documentada)`;
+  return `${files.length} arquivos sem mídia externa (docs/screenshots/ e icons/ do PWA são exceções documentadas)`;
 }
 
 function listJsFiles({ includeTests = true } = {}) {
