@@ -1,0 +1,13 @@
+{
+  "name": "torre-de-ferro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Torre de Ferro: Defesa do Último Posto — jogo 3D de defesa de torre em pt-BR, sem build e sem dependências.",
+  "scripts": {
+    "start": "node serve.mjs",
+    "test": "node tests/simulate.mjs && node tests/static-check.mjs",
+    "test:completo": "node tests/simulate.mjs --completo",
+    "test:browser": "node tests/browser-check.mjs"
+  }
+}
