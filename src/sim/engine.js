@@ -2,13 +2,23 @@
 // Puro: sem DOM/Three/áudio/localStorage/Math.random. Passo fixo de 1/60 s.
 // Emite uma fila de eventos por passo (render/HUD/áudio apenas consomem) e
 // expõe um snapshot serializável em getState().
+//
+// Expansão (issue #20): uma partida é uma FASE da campanha (1..20), com
+// exatamente 2 ondas. O cenário vem da fase (1–7 Deserto, 8–14 Neve,
+// 15–20 Cidade). A caixa inicial, a recompensa por abate, o bônus por onda e a
+// escala de HP usam a progressão por fase/onda global; os desbloqueios de
+// torres, tropas e upgrades são validados aqui (o HUD apenas mostra).
 import {
-  STEP, START_MONEY, START_MONEY_PER_MAP, START_LIVES, PREP_TIME, WAVES_PER_MAP, TOTAL_WAVES,
-  waveBonus, hpForWave, starsForLives, ENEMIES, SPAWN_INTERVALS, TOWERS,
-  TROOPS, TROOP_ORDER, MAP_ORDER, SLOW_CAP, towerStats, sellValue,
+  STEP, START_LIVES, PREP_TIME, WAVES_PER_PHASE, TOTAL_WAVES, TOTAL_PHASES,
+  waveBonus, hpForWave, starsForLives, rewardFor, startingMoneyFor, globalWaveFor,
+  scenarioForPhase, scenarioNameForPhase, phaseInfo, clampPhase,
+  ENEMIES, SPAWN_INTERVALS, TOWERS, TROOPS, TROOP_ORDER, SLOW_CAP,
+  towerUnlocked, troopUnlocked, upgradeUnlocked,
+  TOWER_UNLOCK_PHASE, TROOP_UNLOCK_PHASE, UPGRADE_UNLOCK_PHASE,
+  towerStats, sellValue,
 } from './data.js';
 import { getMap, pathPointAt } from './maps.js';
-import { WAVES } from './waves.js';
+import { waveFor } from './waves.js';
 import { createRng, DEFAULT_SEED } from './rng.js';
 import {
   distance, selectTowerTarget, enemiesInRadius, applySlow, chainNext,
@@ -19,26 +29,50 @@ const round3 = (n) => Math.round(n * 1000) / 1000;
 /** Tempo total de simulação (apenas p/ documentação; TOTAL_WAVES é exportado por data). */
 export const TOTAL_WAVES_SIM = TOTAL_WAVES;
 
+const FIRST_PHASE_BY_SCENARIO = { deserto: 1, neve: 8, cidade: 15 };
+
+function normalizeBonusPermanent(valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(250, Math.max(0, Math.round(n)));
+}
+
 /**
  * Cria um motor de partida.
- * @param {{mapId?:string, seed?:number, money?:number, lives?:number}} opcoes
+ * @param {{phase?:number, mapId?:string, seed?:number, money?:number, lives?:number,
+ *          bonusPermanent?:number}} opcoes
+ * `phase` é a fase da campanha (1..20). `mapId` é aceito apenas como
+ * compatibilidade e mapeia para a 1ª fase do cenário.
  */
 export function createEngine(opcoes = {}) {
-  const mapId = opcoes.mapId || 'deserto';
-  const mapDef = getMap(mapId);
-  if (!mapDef) throw new Error(`Mapa desconhecido: ${mapId}`);
+  let phaseNumber;
+  if (Number.isFinite(Number(opcoes.phase))) phaseNumber = clampPhase(opcoes.phase);
+  else if (typeof opcoes.mapId === 'string' && FIRST_PHASE_BY_SCENARIO[opcoes.mapId]) {
+    phaseNumber = FIRST_PHASE_BY_SCENARIO[opcoes.mapId];
+  } else phaseNumber = 1;
+
+  const info = phaseInfo(phaseNumber);
+  const scenario = info.scenario;
+  const mapDef = getMap(scenario);
+  if (!mapDef) throw new Error(`Cenário desconhecido: ${scenario}`);
 
   const seed = Number.isFinite(opcoes.seed) ? (opcoes.seed >>> 0) : DEFAULT_SEED;
   const rng = createRng(seed);
-  const baseWave = MAP_ORDER.indexOf(mapId) * WAVES_PER_MAP;
+  const bonusPermanent = normalizeBonusPermanent(opcoes.bonusPermanent);
+  const caixaInicial = startingMoneyFor(phaseNumber, bonusPermanent);
 
-  const caixaInicial = Number.isFinite(START_MONEY_PER_MAP[mapId])
-    ? START_MONEY_PER_MAP[mapId]
-    : START_MONEY;
+  // Desbloqueios da fase (fixos durante a partida; o HUD os exibe).
+  const towerUnlocks = {};
+  for (const tipo of Object.keys(TOWERS)) towerUnlocks[tipo] = towerUnlocked(tipo, phaseNumber);
+  const troopUnlocks = {};
+  for (const tipo of TROOP_ORDER) troopUnlocks[tipo] = troopUnlocked(tipo, phaseNumber);
+  const upgradeUnlocks = {};
+  for (const nivel of [2, 3]) upgradeUnlocks[nivel] = upgradeUnlocked(nivel, phaseNumber);
+
   let money = Number.isFinite(opcoes.money) ? Math.max(0, Math.round(opcoes.money)) : caixaInicial;
   let lives = Number.isFinite(opcoes.lives) ? Math.max(0, Math.round(opcoes.lives)) : START_LIVES;
-  let wave = baseWave + 1; // onda atual (durante onda) ou próxima (na preparação)
-  let phase = 'prep';
+  let wave = 1; // onda local dentro da fase (1..2)
+  let phase = 'prep'; // fase da partida: prep | wave | victory | defeat
   let prepLeft = PREP_TIME;
   let waveTime = 0;
   let time = 0;
@@ -78,6 +112,11 @@ export function createEngine(opcoes = {}) {
     return phase === 'victory' || phase === 'defeat';
   }
 
+  /** Onda global (1..40) da onda local atual. */
+  function currentGlobalWave() {
+    return globalWaveFor(phaseNumber, wave);
+  }
+
   function clearCombat() {
     for (const e of enemies) e.removed = true;
     enemies.length = 0;
@@ -93,7 +132,7 @@ export function createEngine(opcoes = {}) {
     lives = Math.max(0, lives);
     phase = 'defeat';
     clearCombat();
-    emit('defeat', { mapId, wave, lives });
+    emit('defeat', { mapId: scenario, phaseNumber, wave, lives });
   }
 
   function triggerVictory() {
@@ -101,15 +140,22 @@ export function createEngine(opcoes = {}) {
     lives = Math.max(1, lives);
     phase = 'victory';
     clearCombat();
-    emit('victory', { mapId, wave, lives, stars: starsForLives(lives) });
+    emit('victory', {
+      mapId: scenario,
+      mapName: mapDef.name,
+      phaseNumber,
+      totalPhases: TOTAL_PHASES,
+      wave,
+      lives,
+      stars: starsForLives(lives),
+    });
   }
 
   // ------------------------------------------------------------------ inimigos
   function spawnEnemy(type) {
     const def = ENEMIES[type];
     if (!def) return null;
-    const w = Math.max(1, wave);
-    const hp = hpForWave(def.hp, w);
+    const hp = hpForWave(def.hp, currentGlobalWave());
     const p = pathPointAt(mapDef, 0);
     const enemy = {
       id: enemySeq++,
@@ -137,12 +183,14 @@ export function createEngine(opcoes = {}) {
     emit('spawn', {
       enemyId: enemy.id, enemyType: type, cls: def.cls,
       x: round3(enemy.x), z: round3(enemy.z), y: def.altitude,
-      hp, maxHp: hp, wave: w, boss: Boolean(def.boss), variant,
+      hp, maxHp: hp, wave, globalWave: currentGlobalWave(),
+      phaseNumber, boss: Boolean(def.boss), variant,
     });
     if (def.boss) {
       bossEnemy = enemy;
       emit('bossSpawn', {
         enemyId: enemy.id, enemyType: type, name: def.name, hp, maxHp: hp,
+        phaseNumber, wave,
       });
     }
     return enemy;
@@ -155,11 +203,12 @@ export function createEngine(opcoes = {}) {
     enemy.removed = true;
     const def = ENEMIES[enemy.type];
     if (bossEnemy === enemy) bossEnemy = null;
-    money += def.reward;
+    const recompensa = rewardFor(def.reward, phaseNumber);
+    money += recompensa;
     stats.kills += 1;
     emit('kill', {
       enemyId: enemy.id, enemyType: enemy.type, x: round3(enemy.x),
-      z: round3(enemy.z), reward: def.reward, boss: Boolean(def.boss),
+      z: round3(enemy.z), reward: recompensa, boss: Boolean(def.boss),
     });
   }
 
@@ -447,17 +496,17 @@ export function createEngine(opcoes = {}) {
 
   // ------------------------------------------------------------------ ondas
   function beginWave(n) {
-    wave = n;
-    phase = 'wave';
-    waveTime = 0;
-    prepLeft = 0;
-    spawnQueue.length = 0;
-    const def = WAVES[n - 1];
+    const def = waveFor(phaseNumber, n);
     if (!def) {
       phase = 'prep';
       prepLeft = PREP_TIME;
       return false;
     }
+    wave = n;
+    phase = 'wave';
+    waveTime = 0;
+    prepLeft = 0;
+    spawnQueue.length = 0;
     let ordem = 0;
     for (const grupo of def.groups) {
       const intervalo = Number(SPAWN_INTERVALS[grupo.type]) || 0;
@@ -466,17 +515,24 @@ export function createEngine(opcoes = {}) {
       }
     }
     spawnQueue.sort((a, b) => (a.at - b.at) || (a.order - b.order));
-    emit('waveStart', { wave: n, mapId, total: spawnQueue.length });
+    emit('waveStart', {
+      wave: n,
+      waveInPhase: n,
+      globalWave: globalWaveFor(phaseNumber, n),
+      phaseNumber,
+      mapId: scenario,
+      total: spawnQueue.length,
+    });
     return true;
   }
 
   function completeWave() {
-    const bonus = waveBonus(wave);
+    const globalWave = currentGlobalWave();
+    const bonus = waveBonus(globalWave);
     money += bonus;
     stats.wavesWon += 1;
-    emit('waveEnd', { wave, bonus });
-    const local = wave - baseWave;
-    if (local >= WAVES_PER_MAP) {
+    emit('waveEnd', { wave, globalWave, phaseNumber, bonus });
+    if (wave >= WAVES_PER_PHASE) {
       if (lives > 0) triggerVictory();
       else triggerDefeat();
       return;
@@ -539,7 +595,7 @@ export function createEngine(opcoes = {}) {
 
   function startWave() {
     if (phase !== 'prep') return false;
-    if (wave - baseWave < 1 || wave - baseWave > WAVES_PER_MAP) return false;
+    if (wave < 1 || wave > WAVES_PER_PHASE) return false;
     return beginWave(wave);
   }
 
@@ -547,6 +603,11 @@ export function createEngine(opcoes = {}) {
     if (towerTerminal()) return { ok: false, error: 'fase-invalida' };
     const def = TOWERS[type];
     if (!def) return { ok: false, error: 'tipo-invalido' };
+    if (!towerUnlocked(type, phaseNumber)) {
+      return {
+        ok: false, error: 'bloqueado', type, unlockPhase: TOWER_UNLOCK_PHASE[type],
+      };
+    }
     const indice = Number(slotIndex);
     if (!Number.isInteger(indice) || indice < 0 || indice >= slots.length) {
       return { ok: false, error: 'slot-invalido' };
@@ -592,6 +653,13 @@ export function createEngine(opcoes = {}) {
     const tower = towers.find((t) => t.id === id && !t.removed);
     if (!tower) return { ok: false, error: 'torre-invalida' };
     if (tower.level >= 3) return { ok: false, error: 'nivel-maximo' };
+    const alvoNivel = tower.level + 1;
+    if (!upgradeUnlocked(alvoNivel, phaseNumber)) {
+      return {
+        ok: false, error: 'bloqueado', type: tower.type, level: alvoNivel,
+        unlockPhase: UPGRADE_UNLOCK_PHASE[alvoNivel],
+      };
+    }
     const def = TOWERS[tower.type];
     const custo = def.costs[tower.level];
     if (money < custo) return { ok: false, error: 'sem-dinheiro' };
@@ -632,6 +700,11 @@ export function createEngine(opcoes = {}) {
     if (towerTerminal()) return { ok: false, error: 'fase-invalida' };
     const def = TROOPS[type];
     if (!def) return { ok: false, error: 'tipo-invalido' };
+    if (!troopUnlocked(type, phaseNumber)) {
+      return {
+        ok: false, error: 'bloqueado', type, unlockPhase: TROOP_UNLOCK_PHASE[type],
+      };
+    }
     const j = Number(pointIndex);
     if (!Number.isInteger(j) || j < 0 || j >= troopPoints.length) {
       return { ok: false, error: 'ponto-invalido' };
@@ -676,17 +749,20 @@ export function createEngine(opcoes = {}) {
   }
 
   // ---------------------------------------------------------------- debug (QA)
+  // `n` é a onda LOCAL da fase (1..2). Também aceita a onda global (1..40) da
+  // própria fase para conveniência de QA: wave = ((n - 1) % 2) + 1.
   function debugStartWave(n) {
     const num = Math.round(Number(n));
     if (!Number.isFinite(num)) return false;
-    const local = num - baseWave;
-    if (local < 1 || local > WAVES_PER_MAP) return false;
+    let local = num;
+    if (num > WAVES_PER_PHASE) local = ((num - 1) % WAVES_PER_PHASE) + 1;
+    if (local < 1 || local > WAVES_PER_PHASE) return false;
     for (const e of enemies) e.removed = true;
     enemies.length = 0;
     for (const p of projectiles) p.removed = true;
     projectiles.length = 0;
     bossEnemy = null;
-    return beginWave(num);
+    return beginWave(local);
   }
 
   function debugSpawnEnemy(type, count = 1) {
@@ -769,7 +845,7 @@ export function createEngine(opcoes = {}) {
       }));
 
     return {
-      mapId,
+      mapId: scenario,
       mapName: mapDef.name,
       map: {
         id: mapDef.id,
@@ -777,9 +853,27 @@ export function createEngine(opcoes = {}) {
         length: mapDef.length,
         waypoints: mapDef.waypoints.map((p) => [p[0], p[1]]),
       },
-      wave,
-      waveLocal: Math.max(1, Math.min(WAVES_PER_MAP, wave - baseWave)),
-      wavesPerMap: WAVES_PER_MAP,
+      // Fase da campanha e progressão.
+      phaseNumber,
+      totalPhases: TOTAL_PHASES,
+      scenario,
+      scenarioName: mapDef.name,
+      wave, // onda local 1..2
+      waveLocal: wave,
+      wavesPerPhase: WAVES_PER_PHASE,
+      totalWaves: TOTAL_WAVES,
+      globalWave: currentGlobalWave(),
+      bonusPermanent,
+      startingMoney: caixaInicial,
+      unlocks: {
+        towers: { ...towerUnlocks },
+        troops: { ...troopUnlocks },
+        upgrades: { ...upgradeUnlocks },
+        towerPhases: { ...TOWER_UNLOCK_PHASE },
+        troopPhases: { ...TROOP_UNLOCK_PHASE },
+        upgradePhases: { ...UPGRADE_UNLOCK_PHASE },
+      },
+      // Fase da partida: prep | wave | victory | defeat.
       phase,
       prepLeft: round3(Math.max(0, prepLeft)),
       waveTime: round3(waveTime),
@@ -826,9 +920,11 @@ export function createEngine(opcoes = {}) {
     forceWin,
     forceLose,
     getMapDef,
+    get phaseNumber() { return phaseNumber; },
+    get scenario() { return scenario; },
     get wave() { return wave; },
     get phase() { return phase; },
-    get mapId() { return mapId; },
+    get mapId() { return scenario; },
     get money() { return money; },
     get lives() { return lives; },
   };

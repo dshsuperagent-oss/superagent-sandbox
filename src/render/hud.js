@@ -3,13 +3,23 @@
 // API fixa: createHud({ handlers }) -> { update, showScreen, toast, setTutorial,
 // updateMaps, setBossBar, dispose }.
 
-import { TOWERS, TROOPS, TROOP_ORDER, MAP_ORDER, MAP_NAMES } from '../sim/data.js';
+import {
+  TOWERS, TROOPS, TROOP_ORDER, MAP_ORDER, MAP_NAMES,
+  TOTAL_PHASES, WAVES_PER_PHASE, PHASES_PER_SCENARIO,
+  TOWER_UNLOCK_PHASE, TROOP_UNLOCK_PHASE, UPGRADE_UNLOCK_PHASE,
+  phasesForScenario, isPhaseUnlocked, completedPhaseCount,
+  towerUnlocked, troopUnlocked, upgradeUnlocked,
+} from '../sim/data.js';
+
+const TODAS_AS_FASES = TOTAL_PHASES || 20;
+const ONDAS_POR_FASE = WAVES_PER_PHASE || 2;
 
 const SCREENS = [
   ['menu', 'screen-menu'],
   ['maps', 'screen-maps'],
   ['game', 'screen-game'],
   ['victory', 'screen-victory'],
+  ['campanha', 'screen-campanha'],
   ['defeat', 'screen-defeat'],
   ['pause', 'screen-pause'],
   ['help', 'screen-help'],
@@ -29,14 +39,14 @@ function falar(texto) {
     .replace(/\s·\sV vende a torre\s·\sEsc fecha/g, ' · V vende a torre');
 }
 
-// Textos do tutorial de 6 passos (Deserto, onda 1).
+// Textos do tutorial de 6 passos (fase 1).
 export const TUTORIAL_STEPS = [
-  'Bem-vindo ao último posto, comandante! Construa torres nos círculos claros ao lado do caminho.',
-  'Clique em um slot vazio do campo e escolha uma torre no painel Construir.',
-  'Inicie a onda quando estiver pronto — ou aguarde a preparação de 25 segundos.',
-  'Clique em uma torre para abrir o painel e melhorá-la: mais dano, alcance e cadência.',
-  'Posicione tropas especiais nos pontos marcados. Fuzileiros bloqueiam inimigos terrestres.',
-  'Sobreviva às 8 ondas do setor. Chefes são resistentes: concentre o fogo e proteja a base!',
+  'Bem-vindo ao último posto, comandante! São 20 fases e 2 ondas por fase. Construa torres nos círculos claros ao lado do caminho.',
+  'Clique em um slot vazio do campo e escolha uma torre no painel Construir. Torres bloqueadas mostram a fase de desbloqueio.',
+  'Inicie a onda quando estiver pronto — ou aguarde a preparação. Cada fase tem 2 ondas: a segunda costuma ser mais pesada.',
+  'Clique em uma torre para abrir o painel e melhorá-la: mais dano, alcance e cadência. Nível 2 libera na fase 2 e nível 3 na fase 5.',
+  'Posicione tropas especiais nos pontos marcados. Fuzileiros bloqueiam terrestres; antiaérea libera na fase 3 e sniper na fase 5.',
+  'São 20 fases em 3 cenários. Chefes nas fases 5, 10, 15 e 20 (terrestre, aéreo, terrestre e mecha): concentre o fogo e proteja a base!',
 ].map(falar);
 
 const ALVO_NOME = {
@@ -48,6 +58,68 @@ const ALVO_NOME = {
 function starsText(stars) {
   const n = Math.max(0, Math.min(3, Math.round(Number(stars) || 0)));
   return '★'.repeat(n) + '☆'.repeat(3 - n);
+}
+
+// ------------------------------------------------------- helpers de progressão
+// Recebem o snapshot do estado/save; não tocam em engine nem localStorage.
+function faseAtual(state) {
+  const n = Math.round(Number(state && state.phaseNumber));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+function totalFases(state) {
+  const n = Math.round(Number(state && state.totalPhases));
+  return Number.isFinite(n) && n >= 1 ? n : TODAS_AS_FASES;
+}
+
+function ondasDaFase(state) {
+  const n = Math.round(Number(state && state.wavesPerPhase));
+  return Number.isFinite(n) && n >= 1 ? n : ONDAS_POR_FASE;
+}
+
+function torreLiberada(state, tipo) {
+  const u = state && state.unlocks && state.unlocks.towers;
+  if (u && typeof u[tipo] === 'boolean') return u[tipo];
+  return towerUnlocked(tipo, faseAtual(state));
+}
+
+function tropaLiberada(state, tipo) {
+  const u = state && state.unlocks && state.unlocks.troops;
+  if (u && typeof u[tipo] === 'boolean') return u[tipo];
+  return troopUnlocked(tipo, faseAtual(state));
+}
+
+// Nível de melhoria bloqueado: devolve a fase mínima, ou null se liberado.
+function desbloqueioNivel(state, nivel) {
+  const u = state && state.unlocks && state.unlocks.upgrades;
+  if (u && typeof u[nivel] === 'boolean') return u[nivel] ? null : (UPGRADE_UNLOCK_PHASE[nivel] || null);
+  return upgradeUnlocked(nivel, faseAtual(state)) ? null : (UPGRADE_UNLOCK_PHASE[nivel] || null);
+}
+
+function fasesConcluidas(save) {
+  if (!save || typeof save !== 'object') return 0;
+  try {
+    return completedPhaseCount(save);
+  } catch (err) {
+    return 0;
+  }
+}
+
+function estrelasTotais(save) {
+  const fases = save && Array.isArray(save.phases) ? save.phases : [];
+  let total = 0;
+  for (const info of fases) {
+    total += Math.max(0, Math.min(3, Math.round(Number(info && info.stars) || 0)));
+  }
+  return total;
+}
+
+function faseLiberadaNoSave(save, fase) {
+  try {
+    return isPhaseUnlocked(save, fase);
+  } catch (err) {
+    return fase === 1;
+  }
 }
 
 function fmtInt(n) {
@@ -189,6 +261,8 @@ export function createHud({ handlers = {} } = {}) {
   bindClick('btn-tutorial-ok', 'tutorialOk');
   bindClick('btn-proxima-missao', 'proximaMissao');
   bindClick('btn-vitoria-missoes', 'missoesVitoria');
+  bindClick('btn-campanha-missoes', 'missoesVitoria');
+  bindClick('btn-campanha-menu', 'voltarMenu');
   bindClick('btn-tentar-de-novo', 'tentarDeNovo');
   bindClick('btn-continuar', 'retomar');
   bindClick('btn-sair', 'sairPartida');
@@ -205,79 +279,169 @@ export function createHud({ handlers = {} } = {}) {
     on(card, 'click', () => call('posicionarTropa', tipo));
   }
 
-  // Cartões de missão são gerados aqui (#map-list começa vazio).
+  // Cartões de missão são gerados aqui (#map-list começa vazio): 20 fases agrupadas por cenário.
   const mapList = el('map-list');
   on(mapList, 'click', (ev) => {
     const alvo = ev && ev.target;
     if (!alvo || typeof alvo.closest !== 'function') return;
-    const card = alvo.closest('.map-card');
+    const card = alvo.closest('.fase-card');
     if (!card || card.disabled) return;
-    const mapId = card.getAttribute('data-map');
-    if (mapId) call('selecionarMapa', mapId);
+    const fase = Number(card.getAttribute('data-fase'));
+    if (Number.isFinite(fase) && fase >= 1) call('selecionarFase', fase);
   });
 
-  // --------------------------------------------------------------- mapas
-  function ensureMapCards() {
+  // --------------------------------------------------------------- missões (20 fases)
+  function fasesDoCenario(cenario) {
+    try {
+      const lista = phasesForScenario(cenario);
+      if (Array.isArray(lista) && lista.length) {
+        return lista
+          .map((item) => (typeof item === 'object' ? Number(item.phase) : Number(item)))
+          .filter((fase) => Number.isFinite(fase) && fase >= 1 && fase <= TODAS_AS_FASES)
+          .map((fase, i, arr) => (arr.indexOf(fase) === i ? fase : null))
+          .filter((fase) => fase != null);
+      }
+    } catch (err) {
+      /* usa o fallback abaixo */
+    }
+    // Fallback: deriva o intervalo do cenário a partir de PHASES_PER_SCENARIO.
+    const contagem = PHASES_PER_SCENARIO || { deserto: 7, neve: 7, cidade: 6 };
+    let inicio = 1;
+    for (const id of MAP_ORDER) {
+      const qtd = Math.max(0, Math.round(Number(contagem[id]) || 0));
+      if (id === cenario) return Array.from({ length: qtd }, (_, i) => inicio + i);
+      inicio += qtd;
+    }
+    return [];
+  }
+
+  function intervaloDoGrupo(fases) {
+    if (!fases.length) return '';
+    const primeiro = fases[0];
+    const ultimo = fases[fases.length - 1];
+    return primeiro === ultimo ? `Fase ${primeiro}` : `Fases ${primeiro}–${ultimo}`;
+  }
+
+  function criarCardFase(fase, cenario) {
+    const card = document.createElement('button');
+    card.className = 'fase-card';
+    card.type = 'button';
+    card.setAttribute('data-fase', String(fase));
+
+    const numero = document.createElement('span');
+    numero.className = 'fase-numero';
+    numero.textContent = `Fase ${fase}`;
+
+    const nomeCenario = document.createElement('span');
+    nomeCenario.className = 'fase-cenario';
+    nomeCenario.textContent = MAP_NAMES[cenario] || cenario;
+
+    const estrelas = document.createElement('span');
+    estrelas.className = 'fase-estrelas';
+    estrelas.textContent = '☆☆☆';
+
+    const estado = document.createElement('span');
+    estado.className = 'fase-estado';
+    estado.textContent = 'Disponível';
+
+    const cadeado = document.createElement('span');
+    cadeado.className = 'fase-cadeado';
+    cadeado.setAttribute('aria-hidden', 'true');
+    cadeado.textContent = '🔒';
+
+    card.appendChild(numero);
+    card.appendChild(nomeCenario);
+    card.appendChild(estrelas);
+    card.appendChild(estado);
+    card.appendChild(cadeado);
+    return card;
+  }
+
+  function ensureFaseCards() {
     const list = el('map-list');
     if (!list || typeof document.createElement !== 'function') return [];
-    let cards = qa(list, '.map-card[data-map]');
-    if (cards.length === 0) {
-      for (const mapId of MAP_ORDER) {
-        const card = document.createElement('button');
-        card.className = 'map-card';
-        card.type = 'button';
-        card.setAttribute('data-map', mapId);
-        const nome = document.createElement('span');
-        nome.className = 'map-nome';
-        nome.textContent = MAP_NAMES[mapId] || mapId;
-        const estrelas = document.createElement('span');
-        estrelas.className = 'map-estrelas';
-        estrelas.textContent = '☆☆☆';
-        const estado = document.createElement('span');
-        estado.className = 'map-estado';
-        estado.textContent = 'Disponível';
-        card.appendChild(nome);
-        card.appendChild(estrelas);
-        card.appendChild(estado);
-        list.appendChild(card);
+    let cards = qa(list, '.fase-card[data-fase]');
+    if (cards.length >= TODAS_AS_FASES) return cards;
+
+    list.textContent = '';
+    cards = [];
+    for (const cenario of MAP_ORDER) {
+      const fases = fasesDoCenario(cenario);
+      if (!fases.length) continue;
+      const grupo = document.createElement('section');
+      grupo.className = 'fase-grupo';
+      grupo.setAttribute('data-cenario', cenario);
+
+      const titulo = document.createElement('h3');
+      titulo.className = 'fase-grupo-titulo';
+      titulo.textContent = `${MAP_NAMES[cenario] || cenario} · ${intervaloDoGrupo(fases)}`;
+
+      const grid = document.createElement('div');
+      grid.className = 'fase-grid';
+      for (const fase of fases) {
+        const card = criarCardFase(fase, cenario);
+        grid.appendChild(card);
         cards.push(card);
       }
+      grupo.appendChild(titulo);
+      grupo.appendChild(grid);
+      list.appendChild(grupo);
     }
     return cards;
   }
 
   function updateMaps(save) {
     if (save && typeof save === 'object') lastSave = save;
-    const cards = ensureMapCards();
+    const cards = ensureFaseCards();
     const fonte = save && typeof save === 'object' ? save : lastSave;
-    const mapsSave = fonte && fonte.maps && typeof fonte.maps === 'object' ? fonte.maps : {};
-    for (const card of cards) {
-      const mapId = card.getAttribute('data-map');
-      const info = mapsSave[mapId] && typeof mapsSave[mapId] === 'object' ? mapsSave[mapId] : {};
-      const unlocked = info.unlocked === true || mapId === 'deserto';
-      const stars = unlocked ? Math.max(0, Math.min(3, Math.round(Number(info.stars) || 0))) : 0;
-      const wavesWon = Math.max(0, Math.round(Number(info.wavesWon) || 0));
-      const concluido = wavesWon >= 8 || stars > 0;
+    const fases = fonte && Array.isArray(fonte.phases) ? fonte.phases : [];
+    const total = TODAS_AS_FASES;
 
-      setTextIn(card, '.map-nome', MAP_NAMES[mapId] || mapId);
-      setTextIn(card, '.map-estrelas', starsText(stars));
+    let concluidas = 0;
+    for (const card of cards) {
+      const fase = Number(card.getAttribute('data-fase'));
+      const info = fases[fase - 1] && typeof fases[fase - 1] === 'object' ? fases[fase - 1] : {};
+      const liberada = faseLiberadaNoSave(fonte, fase);
+      const stars = liberada ? Math.max(0, Math.min(3, Math.round(Number(info.stars) || 0))) : 0;
+      const concluida = liberada && info.completed === true;
+      const bestLives = Math.max(0, Math.round(Number(info.bestLives) || 0));
+      if (concluida) concluidas += 1;
+
+      setTextIn(card, '.fase-numero', `Fase ${fase}`);
+      setTextIn(card, '.fase-estrelas', starsText(stars));
 
       let estado;
-      if (!unlocked) {
-        estado = 'Bloqueado (complete o mapa anterior)';
-      } else if (concluido) {
-        const melhor = info.bestLives > 0 ? ` · melhor: ${fmtInt(info.bestLives)} vidas` : '';
-        estado = `Setor defendido${melhor}`;
+      if (!liberada) {
+        estado = 'Bloqueada';
+      } else if (concluida) {
+        estado = `Concluída${bestLives > 0 ? ` · melhor: ${fmtInt(bestLives)} vidas` : ''}`;
       } else {
         estado = 'Disponível';
       }
-      setTextIn(card, '.map-estado', estado);
-      card.disabled = !unlocked;
+      setTextIn(card, '.fase-estado', estado);
+
+      card.disabled = !liberada;
       if (card.classList) {
-        card.classList.toggle('map-card--bloqueado', !unlocked);
-        card.classList.toggle('map-card--concluido', unlocked && concluido);
+        card.classList.toggle('fase-card--bloqueada', !liberada);
+        card.classList.toggle('fase-card--concluida', concluida);
+        card.classList.toggle('fase-card--disponivel', liberada && !concluida);
+      }
+      const cadeado = q(card, '.fase-cadeado');
+      if (cadeado) setHidden(cadeado, liberada);
+      if (card.setAttribute) {
+        card.setAttribute('aria-label', liberada ? `Fase ${fase}, ${estado}` : `Fase ${fase}, bloqueada`);
       }
     }
+
+    const progresso = el('map-progresso');
+    if (progresso) {
+      const totalStars = estrelasTotais(fonte);
+      setText(
+        progresso,
+        `${fmtInt(concluidas)}/${fmtInt(total)} fases concluídas · ${fmtInt(totalStars)}/${fmtInt(total * 3)} estrelas`,
+      );
+    }
+    return { concluidas, total, estrelas: estrelasTotais(fonte) };
   }
 
   // --------------------------------------------------------------- telas
@@ -317,19 +481,47 @@ export function createHud({ handlers = {} } = {}) {
         btn.disabled = !hasNext;
         setText(btn, hasNext ? 'Próxima missão' : 'Campanha concluída');
       }
-      if (info.mapName) setText('vitoria-mapa', info.mapName);
+      if (info.faseLabel) {
+        setText('vitoria-mapa', info.faseLabel);
+      } else if (info.phaseNumber) {
+        setText('vitoria-mapa', `Fase ${fmtInt(info.phaseNumber)}/${fmtInt(info.totalPhases || TODAS_AS_FASES)}`);
+      } else if (info.mapName) {
+        setText('vitoria-mapa', info.mapName);
+      }
     }
-    if (nome === 'defeat' && dados && dados.mapName) {
-      setText('derrota-mapa', dados.mapName);
+    if (nome === 'campanha') {
+      const save = dados && dados.save ? dados.save : lastSave;
+      const total = TODAS_AS_FASES;
+      const fasesOk = fasesConcluidas(save);
+      const estrelas = estrelasTotais(save);
+      setText('campanha-fases', `${fmtInt(fasesOk)}/${fmtInt(total)} fases concluídas`);
+      setText('campanha-estrelas', `${fmtInt(estrelas)}/${fmtInt(total * 3)}`);
+      const detalhe = el('campanha-detalhe');
+      if (detalhe) {
+        const vidas = save && save.totals ? Math.round(Number(save.totals.kills) || 0) : 0;
+        setText(detalhe, `Abates na campanha: ${fmtInt(vidas)} · bônus permanente: +$${fmtInt(save && save.bonusPermanent)}`);
+      }
+    }
+    if (nome === 'defeat') {
+      const info = dados || {};
+      if (info.faseLabel) {
+        setText('derrota-mapa', info.faseLabel);
+      } else if (info.phaseNumber) {
+        setText('derrota-mapa', `Fase ${fmtInt(info.phaseNumber)}/${fmtInt(info.totalPhases || TODAS_AS_FASES)} · ${info.scenarioName || info.mapName || ''}`.trim());
+      } else if (info.mapName) {
+        setText('derrota-mapa', info.mapName);
+      }
     }
     // Entrar em jogo/esconder overlays fecha tutorial? Não: o tutorial é do jogo.
   }
 
   // --------------------------------------------------------------- HUD topo
-  function localWave(state) {
-    const global = Math.max(1, Math.round(Number(state.wave) || 1));
-    const base = Math.max(0, MAP_ORDER.indexOf(state.mapId)) * 8;
-    return Math.max(1, Math.min(8, global - base));
+  function ondaLocal(state) {
+    // `state.wave` é a onda local (1..2) no contrato; o módulo cobre também um
+    // eventual valor global (1..40), que daria o mesmo resultado local.
+    const bruta = Math.max(1, Math.round(Number(state.wave) || 1));
+    const porFase = ondasDaFase(state);
+    return ((bruta - 1) % porFase) + 1;
   }
 
   function updateWaveButton(state) {
@@ -345,7 +537,7 @@ export function createHud({ handlers = {} } = {}) {
       setText(btn, 'Onda em andamento');
     } else {
       btn.disabled = true;
-      setText(btn, phase === 'victory' ? 'Setor defendido' : 'Fim de partida');
+      setText(btn, phase === 'victory' ? 'Fase defendida' : 'Fim de partida');
     }
   }
 
@@ -369,6 +561,26 @@ export function createHud({ handlers = {} } = {}) {
   }
 
   // --------------------------------------------------------------- painéis
+  // Cria (uma vez) o selo de desbloqueio dentro do card e atualiza o estado.
+  function garantirBloqueio(card, classe) {
+    let span = q(card, `.${classe}`);
+    if (!span && typeof document.createElement === 'function') {
+      span = document.createElement('span');
+      span.className = classe;
+      card.appendChild(span);
+    }
+    return span;
+  }
+
+  function marcarBloqueio(card, bloqueado, faseMin, classeSelo, classeCard) {
+    const selo = garantirBloqueio(card, classeSelo);
+    if (selo) {
+      setText(selo, bloqueado ? `Desbloqueia na fase ${fmtInt(faseMin)}` : '');
+      setHidden(selo, !bloqueado);
+    }
+    toggleClass(card, classeCard, !!bloqueado);
+  }
+
   function updateBuildPanel(state) {
     const painel = el('painel-construir');
     if (!painel) return;
@@ -377,11 +589,15 @@ export function createHud({ handlers = {} } = {}) {
       const def = TOWERS[tipo];
       if (!def) continue;
       const custo = Array.isArray(def.costs) ? def.costs[0] : 0;
+      const liberada = torreLiberada(state, tipo);
+      const faseMin = TOWER_UNLOCK_PHASE ? TOWER_UNLOCK_PHASE[tipo] : null;
+
       setTextIn(card, '.torre-nome', def.name || tipo);
       setTextIn(card, '.torre-alvo', `Alvo: ${ALVO_NOME[def.target] || 'qualquer'}${def.effect === 'splash' ? ' · área' : ''}${def.effect === 'chain' ? ' · cadeia' : ''}${def.effect === 'slow' ? ' · lentidão' : ''}${def.effect === 'missile' ? ' · teleguiado' : ''}`);
       setTextIn(card, '.torre-custo', `$${fmtInt(custo)}`);
-      card.disabled = Number(state.money) < Number(custo);
-      toggleClass(card, 'torre-card--indisponivel', card.disabled);
+      marcarBloqueio(card, !liberada, faseMin, 'torre-bloqueio', 'torre-card--bloqueada');
+      card.disabled = !liberada || Number(state.money) < Number(custo);
+      toggleClass(card, 'torre-card--indisponivel', liberada && card.disabled);
     }
   }
 
@@ -406,12 +622,19 @@ export function createHud({ handlers = {} } = {}) {
     const btnMelhorar = el('btn-melhorar');
     if (btnMelhorar) {
       const custo = nextUpgradeCost(tower);
+      const faseBloqueio = custo == null ? null : desbloqueioNivel(state, nivel + 1);
       if (custo == null) {
         btnMelhorar.disabled = true;
         setText(btnMelhorar, 'Nível máximo');
+        toggleClass(btnMelhorar, 'botao--bloqueado', false);
+      } else if (faseBloqueio != null) {
+        btnMelhorar.disabled = true;
+        setText(btnMelhorar, `Desbloqueia na fase ${fmtInt(faseBloqueio)}`);
+        toggleClass(btnMelhorar, 'botao--bloqueado', true);
       } else {
         btnMelhorar.disabled = Number(state.money) < custo;
         setText(btnMelhorar, `Melhorar $${fmtInt(custo)}`);
+        toggleClass(btnMelhorar, 'botao--bloqueado', false);
       }
     }
 
@@ -439,13 +662,18 @@ export function createHud({ handlers = {} } = {}) {
       const def = TROOPS[tipo];
       if (!def) continue;
       const estado = el(`tropa-estado-${tipo}`) || q(card, '.tropa-estado');
+      const liberada = tropaLiberada(state, tipo);
+      const faseMin = TROOP_UNLOCK_PHASE ? TROOP_UNLOCK_PHASE[tipo] : null;
       const viva = tropas.find((t) => t && t.type === tipo);
       const cd = cooldowns.find((c) => c && c.type === tipo) || null;
       let texto = 'Posicionar';
       let recarga = false;
       let disponivel = true;
 
-      if (viva) {
+      if (!liberada) {
+        texto = `Desbloqueia na fase ${fmtInt(faseMin)}`;
+        disponivel = false;
+      } else if (viva) {
         const ponto = Number.isFinite(Number(viva.point)) ? Math.round(Number(viva.point)) + 1 : null;
         texto = ponto ? `Viva no ponto ${ponto}` : 'Viva em campo';
         disponivel = false;
@@ -464,8 +692,9 @@ export function createHud({ handlers = {} } = {}) {
       toggleClass(estado, 'tropa-estado--recarga', recarga);
       setTextIn(card, '.tropa-custo', `$${fmtInt(custo)}`);
       setTextIn(card, '.tropa-nome', def.name || tipo);
-      card.disabled = !disponivel || Number(state.money) < custo;
-      toggleClass(card, 'tropa-card--posicionando', ui.deployTipo === tipo);
+      marcarBloqueio(card, !liberada, faseMin, 'tropa-bloqueio', 'tropa-card--bloqueada');
+      card.disabled = !disponivel || !liberada || Number(state.money) < custo;
+      toggleClass(card, 'tropa-card--posicionando', liberada && ui.deployTipo === tipo);
     }
   }
 
@@ -529,6 +758,37 @@ export function createHud({ handlers = {} } = {}) {
     }, 3000);
   }
 
+  // BUG-MOB-04: em toque, ancora a barra do chefe logo abaixo da HUD real
+  // (as linhas da HUD variam com largura/fonte). O CSS já dá o fallback em rem;
+  // aqui refinamos em px para nunca cobrir/intersectar os botões.
+  let ultimoTopoBarra = null;
+
+  function ehToque() {
+    try {
+      return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && window.matchMedia('(pointer: coarse)').matches;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function posicionarBarraChefe() {
+    const barra = el('chefe-barra');
+    const hud = el('hud-top');
+    if (!barra || !hud || !barra.style) return;
+    if (!ehToque()) {
+      if (barra.style.top) barra.style.top = '';
+      ultimoTopoBarra = null;
+      return;
+    }
+    const hudBottom = hud.getBoundingClientRect ? hud.getBoundingClientRect().bottom : 0;
+    if (!Number.isFinite(hudBottom) || hudBottom <= 0) return;
+    const topo = Math.round(hudBottom + 10);
+    if (topo === ultimoTopoBarra) return;
+    ultimoTopoBarra = topo;
+    barra.style.top = `${topo}px`;
+  }
+
   function setBossBar(boss) {
     const barra = el('chefe-barra');
     if (!boss) {
@@ -545,6 +805,7 @@ export function createHud({ handlers = {} } = {}) {
     const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
     if (vida && vida.style) vida.style.width = `${pct.toFixed(1)}%`;
     setText('chefe-vida-texto', `${fmtInt(hp)} / ${fmtInt(maxHp)} · ${pctText(hp, maxHp)}`);
+    posicionarBarraChefe();
     if (boss.id !== currentBossId) {
       currentBossId = boss.id;
       showBossAlert(boss);
@@ -580,8 +841,8 @@ export function createHud({ handlers = {} } = {}) {
 
     setText('hud-dinheiro', fmtInt(state.money));
     setText('hud-vidas', fmtInt(state.lives));
-    setText('hud-onda', `Onda ${localWave(state)}/8`);
-    setText('hud-mapa', state.mapName || MAP_NAMES[state.mapId] || 'Setor');
+    setText('hud-onda', `Fase ${fmtInt(faseAtual(state))}/${fmtInt(totalFases(state))} · Onda ${fmtInt(ondaLocal(state))}/${fmtInt(ondasDaFase(state))}`);
+    setText('hud-mapa', state.scenarioName || state.mapName || MAP_NAMES[state.scenario] || MAP_NAMES[state.mapId] || 'Cenário');
     updateWaveButton(state);
 
     const speed = u.speed === 2 || state.speed === 2 ? 2 : 1;
