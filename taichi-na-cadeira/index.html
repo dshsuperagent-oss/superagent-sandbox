@@ -1,0 +1,2118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Taichi na Cadeira: programa completo de tai chi sentado em 8 semanas e 24 sessões, com 8 movimentos ilustrados, respiração, guia do mentor e segurança. Funciona offline, em português do Brasil.">
+<meta name="color-scheme" content="light">
+<title>Taichi na Cadeira — programa de 8 semanas, 24 sessões em casa</title>
+<style>
+/* ============================================================
+   Taichi na Cadeira — estilos em arquivo único, sem dependências
+   ============================================================ */
+:root {
+  --paper: #f6f2ea;
+  --surface: #fffdf8;
+  --surface-2: #efe9dc;
+  --ink: #22312c;
+  --muted: #4c5f57;
+  --verde: #1f4a41;
+  --verde-2: #2e6357;
+  --sage: #dce8e0;
+  --linha: #d9cdb8;
+  --terra: #a34f2b;
+  --terra-escura: #823d1e;
+  --alerta: #7d1c1c;
+  --alerta-escura: #4f1010;
+  --foco: #b45309;
+  --sombra: 0 10px 30px rgba(34, 49, 44, 0.08);
+  --raio: 18px;
+  --max: 1180px;
+  --fonte-texto: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fonte-titulo: Georgia, "Times New Roman", "Palatino Linotype", serif;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--fonte-texto);
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.65;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--fonte-titulo);
+  line-height: 1.2;
+  color: var(--verde);
+  margin: 0 0 0.5em;
+}
+
+h1 { font-size: clamp(2.2rem, 4.8vw, 3.4rem); margin-top: 0.1em; }
+h2 { font-size: clamp(1.7rem, 3.2vw, 2.25rem); }
+h3 { font-size: 1.35rem; }
+h4 { font-size: 1.1rem; }
+
+p { margin: 0 0 1em; max-width: 74ch; }
+ul, ol { margin: 0 0 1em; padding-left: 1.4rem; }
+li { margin: 0.35em 0; }
+
+a { color: var(--verde); text-decoration: underline; text-underline-offset: 0.16em; text-decoration-thickness: 0.08em; }
+a:hover { color: var(--terra-escura); }
+
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.container { width: min(100% - 2rem, var(--max)); margin-inline: auto; }
+
+/* Atalho de acessibilidade */
+.pular {
+  position: absolute;
+  left: 1rem;
+  top: -120px;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--verde);
+  font-weight: 700;
+  padding: 0.8rem 1.1rem;
+  border: 3px solid var(--verde);
+  border-radius: 12px;
+  text-decoration: none;
+}
+.pular:focus { top: 1rem; }
+
+/* Cabeçalho e navegação */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(246, 242, 234, 0.97);
+  border-bottom: 1px solid var(--linha);
+}
+.cabecalho-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0;
+}
+.marca {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--verde);
+  white-space: nowrap;
+}
+.marca span { color: var(--terra); }
+.nav-principal { flex: 1 1 auto; min-width: 0; }
+.nav-lista {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.15rem 1.1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem 0;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+.nav-lista li { margin: 0; }
+.nav-lista a {
+  display: inline-block;
+  white-space: nowrap;
+  text-decoration: none;
+  font-size: 0.98rem;
+  padding: 0.35rem 0.15rem;
+  border-bottom: 2px solid transparent;
+}
+.nav-lista a:hover, .nav-lista a:focus-visible { border-bottom-color: var(--terra); }
+
+/* Hero */
+.hero {
+  padding: clamp(2rem, 5vw, 3.75rem) 0 clamp(1.75rem, 4vw, 2.75rem);
+  background:
+    radial-gradient(900px 460px at 12% -10%, #e4ece3 0%, rgba(228, 236, 227, 0) 65%),
+    radial-gradient(820px 420px at 100% 0%, #f1e5d4 0%, rgba(241, 229, 212, 0) 70%);
+}
+.hero-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: center;
+}
+.hero-olho {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--terra);
+  margin: 0 0 0.6rem;
+}
+.hero-sub { font-size: 1.17rem; color: var(--muted); max-width: 62ch; }
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 1.5rem;
+}
+.chips li {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+  padding: 0.32rem 0.85rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--verde);
+}
+.botoes { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0 0 1rem; }
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.02rem;
+  line-height: 1.2;
+  padding: 0.8rem 1.3rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.botao-primario { background: var(--verde); color: #fffdf8; border-color: var(--verde); }
+.botao-primario:hover { background: var(--verde-2); border-color: var(--verde-2); color: #fffdf8; }
+.botao-secundario { background: var(--surface); color: var(--verde); border-color: var(--verde); }
+.botao-secundario:hover { background: var(--sage); color: var(--verde); }
+.botao-claro { background: #fffdf8; color: var(--verde); border-color: #fffdf8; }
+.botao-claro:hover { background: #f0e9da; color: var(--verde); }
+.botao-contorno { background: transparent; color: #fffdf8; border-color: #a9c4b6; }
+.botao-contorno:hover { background: rgba(255, 253, 248, 0.12); color: #fffdf8; }
+.botao:disabled { opacity: 0.55; cursor: not-allowed; }
+.nota-pequena { font-size: 0.98rem; color: var(--muted); margin: 0.4rem 0 0; }
+
+.cartao-hero {
+  background: var(--surface);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  padding: 1.4rem 1.5rem;
+  box-shadow: var(--sombra);
+}
+.cartao-hero h2 { font-size: 1.3rem; margin-bottom: 0.6rem; }
+.cartao-hero ol { margin: 0; padding-left: 1.3rem; }
+.cartao-hero li { margin: 0.45rem 0; }
+
+/* Aviso rápido de segurança */
+.aviso-rapido {
+  margin-top: 1.9rem;
+  background: var(--alerta);
+  color: #fff6ee;
+  border: 4px solid var(--alerta-escura);
+  border-radius: var(--raio);
+  padding: 1.1rem 1.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.1rem;
+  box-shadow: var(--sombra);
+}
+.aviso-rapido p { margin: 0; max-width: none; color: #fff6ee; }
+.aviso-rapido strong { color: #ffd9c4; }
+.aviso-rapido a { color: #fffdf8; font-weight: 700; }
+.sinal {
+  flex: 0 0 auto;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: #fff6ee;
+  color: var(--alerta);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 1.3rem;
+  font-family: var(--fonte-texto);
+}
+
+/* Seções */
+.secao { padding: clamp(2.25rem, 5vw, 3.5rem) 0; border-top: 1px solid var(--linha); }
+.secao-cabeca { margin-bottom: 1.5rem; }
+.secao-olho {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--terra);
+  margin-bottom: 0.35rem;
+}
+.secao-cabeca p { color: var(--muted); margin-bottom: 0; }
+
+/* Grade de cartões de movimento */
+.grade-movimentos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+.cartao {
+  background: var(--surface);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  padding: 1.3rem 1.35rem 1.45rem;
+  box-shadow: var(--sombra);
+  scroll-margin-top: 100px;
+}
+.cartao.fluxo-ativo {
+  border-color: var(--terra);
+  outline: 4px solid rgba(163, 79, 43, 0.55);
+  outline-offset: 2px;
+  background: #fffcf5;
+}
+.cartao-topo { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 0.75rem; }
+.numero {
+  flex: 0 0 auto;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #fffdf8;
+  display: grid;
+  place-items: center;
+  font-family: var(--fonte-titulo);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.cartao h3 { margin: 0; font-size: 1.42rem; }
+.chines { margin: 0.2rem 0 0; color: var(--muted); font-size: 1rem; line-height: 1.45; }
+.chines .hanzi { font-weight: 600; }
+.chines .traducao { font-style: italic; }
+
+.figura {
+  margin: 0.5rem 0 1rem;
+  background: #fffdf8;
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  padding: 0.7rem 0.7rem 0.5rem;
+}
+.figura svg { display: block; width: 100%; height: auto; }
+figcaption { font-size: 0.95rem; color: var(--muted); margin-top: 0.35rem; }
+
+.passos { margin: 0.2rem 0 1rem; padding-left: 1.35rem; }
+.passos li { margin: 0.3rem 0; }
+.dados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+.dados div { background: var(--surface-2); border-radius: 12px; padding: 0.6rem 0.8rem; }
+.dados dt {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.dados dd { margin: 0.15rem 0 0; font-weight: 700; color: var(--verde); }
+.dica {
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  background: #f4efe3;
+  border-left: 5px solid var(--terra);
+  border-radius: 0 12px 12px 0;
+  font-size: 0.99rem;
+  max-width: none;
+}
+.dica strong { color: var(--terra-escura); }
+
+/* Painel do fluxo contínuo */
+.painel-fluxo {
+  background: linear-gradient(135deg, var(--verde) 0%, var(--verde-2) 100%);
+  color: #f7f3ea;
+  border-radius: var(--raio);
+  padding: clamp(1.25rem, 3vw, 1.9rem);
+  margin: 1.5rem 0 0.5rem;
+  box-shadow: var(--sombra);
+}
+.painel-fluxo h3 { color: #fffdf8; margin-top: 0; }
+.painel-fluxo p { color: #e8efe9; max-width: 76ch; }
+.painel-fluxo p strong { color: #ffd9c4; }
+.fluxo-controles { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0; }
+.fluxo-status {
+  background: rgba(255, 253, 248, 0.14);
+  border: 1px solid rgba(255, 253, 248, 0.35);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  margin: 0;
+  font-weight: 700;
+  max-width: none;
+}
+.fluxo-tempo {
+  margin: 0.55rem 0 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f6e6c4;
+  font-variant-numeric: tabular-nums;
+  max-width: none;
+}
+
+/* Estrutura do programa */
+.estrutura {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 1.75rem;
+}
+.estrutura li {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+}
+.estrutura strong { display: block; font-family: var(--fonte-titulo); font-size: 1.12rem; color: var(--verde); }
+.estrutura .tempo { display: block; color: var(--terra); font-weight: 700; font-size: 0.95rem; margin-bottom: 0.35rem; }
+
+/* Tabelas */
+.tabela-rolagem {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  background: var(--surface);
+  margin: 1rem 0 1.4rem;
+}
+.tabela-rolagem:focus-visible { outline: 3px solid var(--foco); outline-offset: 3px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 1rem; }
+caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.9rem 1rem 0.25rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--verde);
+  font-family: var(--fonte-titulo);
+}
+th, td { padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--linha); text-align: left; vertical-align: top; }
+thead th { background: var(--verde); color: #f9f4e9; font-size: 0.95rem; letter-spacing: 0.01em; }
+tbody tr:nth-child(even) { background: #faf6ee; }
+tbody tr:last-child td { border-bottom: none; }
+.tabela-sessoes { min-width: 720px; }
+.tabela-semanas { min-width: 680px; }
+.num-sessao { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--verde); }
+.destaque-linha td { background: var(--sage); }
+
+/* Mentor */
+.blocos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+}
+.bloco {
+  background: var(--surface);
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  padding: 1.25rem 1.35rem;
+}
+.bloco > :last-child { margin-bottom: 0; }
+.bloco ul, .bloco ol { margin-bottom: 0; }
+.bloco h3 { margin-top: 0; font-size: 1.25rem; }
+.borda-progressao { border-top: 6px solid var(--verde-2); }
+.borda-regressao { border-top: 6px solid var(--alerta); }
+.registro input {
+  width: 4.4rem;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid #b3a58d;
+  border-radius: 8px;
+  background: #fffdf8;
+  color: var(--ink);
+}
+.registro th:first-child, .registro td:first-child { white-space: nowrap; }
+.legenda-escala { font-size: 0.98rem; color: var(--muted); margin-top: -0.4rem; }
+.legenda-escala strong { color: var(--verde); }
+
+/* Segurança */
+.alerta-seguranca {
+  background: var(--alerta);
+  color: #fff6ee;
+  border: 4px solid var(--alerta-escura);
+  border-radius: var(--raio);
+  padding: clamp(1.2rem, 3vw, 1.8rem);
+  box-shadow: var(--sombra);
+}
+.alerta-seguranca h3 { color: #fffdf8; margin-top: 0; }
+.alerta-seguranca p, .alerta-seguranca li { color: #fff6ee; }
+.alerta-seguranca strong { color: #ffd9c4; }
+.alerta-seguranca ul { margin-bottom: 0; }
+.alerta-seguranca a { color: #fffdf8; }
+.grade-seguranca {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { position: relative; padding-left: 2.1rem; margin: 0.55rem 0; }
+.checklist li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0.05rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  background: var(--sage);
+  color: var(--verde);
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+.lista-parar { list-style: none; padding: 0; margin: 0; }
+.lista-parar li { position: relative; padding-left: 2.1rem; margin: 0.55rem 0; }
+.lista-parar li::before {
+  content: "!";
+  position: absolute;
+  left: 0;
+  top: 0.05rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  background: var(--alerta);
+  color: #fff6ee;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+}
+
+/* Escritório */
+.rotina-lista { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+.rotina-lista li {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding: 0.55rem 0;
+  border-bottom: 1px dashed var(--linha);
+}
+.rotina-lista li:last-child { border-bottom: none; }
+.rotina-lista .tempo { font-weight: 700; color: var(--terra); font-variant-numeric: tabular-nums; }
+.mov-indicados { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+.mov-indicados li { margin: 0.6rem 0; }
+.mov-indicados a { font-weight: 700; }
+.mov-indicados span { display: block; font-size: 0.98rem; color: var(--muted); }
+.aviso-escritorio {
+  background: #fdf3e3;
+  border: 2px solid #d8a25f;
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  margin-top: 1.25rem;
+}
+.aviso-escritorio p { margin: 0; max-width: none; }
+.aviso-escritorio strong { color: var(--terra-escura); }
+
+/* Imprimir */
+.caixa-imprimir {
+  background: var(--surface);
+  border: 2px dashed var(--terra);
+  border-radius: var(--raio);
+  padding: clamp(1.2rem, 3vw, 1.75rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.caixa-imprimir p { margin: 0; max-width: 62ch; color: var(--muted); }
+
+/* Rodapé */
+.rodape {
+  background: var(--verde);
+  color: #f1ece1;
+  padding: 2.5rem 0 2.75rem;
+  margin-top: 3rem;
+}
+.rodape h2 { color: #fffdf8; font-size: 1.4rem; }
+.rodape p, .rodape li { color: #e8efe9; }
+.rodape a { color: #fffdf8; }
+.rodape .nota { font-size: 0.98rem; }
+.rodape-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1.5rem; }
+.rodape ul { padding-left: 1.2rem; }
+
+/* ============================================================
+   Estilos internos dos 9 SVGs (mesmas classes usadas no HTML)
+   ============================================================ */
+.svg-cadeira { fill: #b98a5c; }
+.svg-cadeira-escura { fill: #8a5a33; }
+.svg-cadeira-linha { fill: none; stroke: #8a5a33; stroke-width: 5; stroke-linecap: round; }
+.svg-chao { stroke: #c9bca6; stroke-width: 4; stroke-linecap: round; }
+.svg-corpo { fill: none; stroke: #2f4b43; stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+.svg-coxa { fill: none; stroke: #2f4b43; stroke-width: 18; stroke-linecap: round; }
+.svg-perna { fill: none; stroke: #2f4b43; stroke-width: 13; stroke-linecap: round; }
+.svg-pe { fill: none; stroke: #2f4b43; stroke-width: 8; stroke-linecap: round; }
+.svg-cabeca { fill: #2f4b43; }
+.svg-braco { fill: none; stroke: #4d7266; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.svg-mao { fill: #2f4b43; }
+.svg-fantasma { fill: none; stroke: #93aaa0; stroke-width: 7.5; stroke-linecap: round; stroke-linejoin: round; }
+.svg-ponto-fantasma { fill: #93aaa0; }
+.svg-seta { fill: none; stroke: #b45309; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.svg-rotulo { font-family: var(--fonte-texto); font-size: 12px; fill: #5a6b64; }
+.svg-rotulo-caixa { font-family: var(--fonte-texto); font-size: 17px; fill: #22312c; }
+.svg-caixa { fill: #fffdf8; stroke: #cbbda5; stroke-width: 2; }
+.svg-ponto { fill: #a34f2b; }
+.svg-linha-guia { fill: none; stroke: #a34f2b; stroke-width: 2; stroke-dasharray: 5 5; }
+
+.rotulo-passos {
+  font-family: var(--fonte-texto);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--terra-escura);
+  margin: 0.15rem 0 0.35rem;
+}
+.dica-rolagem { display: none; font-size: 0.95rem; color: var(--muted); margin: -0.55rem 0 0.95rem; }
+.tabela-semanas tbody th[scope="row"] { white-space: nowrap; }
+
+.painel-fluxo .nota-pequena { color: #d7e4da; }
+.figura-postura { max-width: 800px; margin-inline: auto; }
+.figura-postura .diagrama-rolagem { overflow-x: auto; }
+.figura-postura svg { width: 100%; height: auto; }
+@media (max-width: 720px) {
+  .figura-postura svg { min-width: 560px; }
+}
+
+/* Responsivo */
+@media (max-width: 900px) {
+  .hero-grade { grid-template-columns: minmax(0, 1fr); }
+  .cartao-hero { order: 2; }
+}
+@media (max-width: 720px) {
+  .dica-rolagem { display: block; }
+}
+@media (max-width: 640px) {
+  html { scroll-padding-top: 84px; }
+  body { font-size: 1.125rem; }
+  .cabecalho { position: static; }
+  .cabecalho-linha { padding: 0.6rem 0; }
+  .container { width: min(100% - 1.5rem, var(--max)); }
+  .secao { padding: 2rem 0; }
+  .cartao { padding: 1.1rem; }
+  .cartao h3 { font-size: 1.28rem; }
+  .rotina-lista li { grid-template-columns: 1fr; gap: 0.15rem; }
+  .caixa-imprimir { flex-direction: column; align-items: flex-start; }
+  .figura { padding: 0.5rem; }
+}
+
+/* Folha de bolso: existe no DOM, aparece somente na impressão */
+.so-impressao { display: none; }
+
+/* Movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Impressão / PDF */
+@media print {
+  @page { margin: 1.5cm; }
+  html, body { background: #fff !important; color: #000 !important; font-size: 11pt; }
+  body { line-height: 1.4; }
+  .cabecalho, .pular, .no-print, .painel-fluxo, .botoes, .botao, .sinal,
+  .aviso-rapido .botao, .caixa-imprimir .botao { display: none !important; }
+  .container { width: auto; max-width: none; margin: 0; }
+  .hero { padding: 0 0 0.5cm; background: none !important; }
+  .hero-grade { display: block; }
+  .cartao-hero { border: 1px solid #666; box-shadow: none; margin-top: 0.4cm; }
+  h1, h2, h3, h4 { color: #000 !important; }
+  h1 { font-size: 24pt; }
+  h2 { font-size: 17pt; }
+  h3 { font-size: 13pt; }
+  a { color: #000 !important; text-decoration: underline; }
+  .secao { padding: 0.55cm 0; border-top: 1px solid #999; break-inside: auto; }
+  .secao-cabeca { margin-bottom: 0.3cm; }
+  .grade-movimentos { display: block; margin-top: 0.3cm; }
+  .cartao {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #777;
+    margin: 0 0 0.45cm;
+    padding: 0.4cm;
+    background: #fff !important;
+  }
+  .cartao.fluxo-ativo { outline: none !important; border-color: #777 !important; background: #fff !important; }
+  .figura { break-inside: avoid; page-break-inside: avoid; padding: 0.2cm; }
+  .figura svg { max-height: 8.6cm; width: auto; max-width: 100%; margin: 0 auto; }
+  .dados { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.2cm; }
+  .dados div { background: #f2f2f2 !important; }
+  .dica { background: #f2f2f2 !important; border-left: 3px solid #555; }
+  .dica strong { color: #000 !important; }
+  .tabela-rolagem { overflow: visible !important; border: 1px solid #777; break-inside: auto; }
+  table { min-width: 0 !important; font-size: 9.5pt; }
+  thead th { background: #ddd !important; color: #000 !important; }
+  tbody tr:nth-child(even) { background: #f5f5f5 !important; }
+  th, td { border-bottom: 1px solid #999; padding: 0.12cm 0.2cm; }
+  .alerta-seguranca {
+    background: #fff !important;
+    color: #000 !important;
+    border: 2px solid #000 !important;
+    break-inside: avoid;
+    padding: 0.35cm;
+  }
+  .alerta-seguranca h3, .alerta-seguranca p, .alerta-seguranca li,
+  .alerta-seguranca strong, .alerta-seguranca a { color: #000 !important; }
+  .aviso-escritorio, .aviso-rapido { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; }
+  .aviso-escritorio p, .aviso-escritorio strong,
+  .aviso-rapido p, .aviso-rapido strong, .aviso-rapido a { color: #000 !important; }
+  .registro input { border: 1px solid #666 !important; width: 2.8rem; background: #fff !important; }
+  .cartao-hero { box-shadow: none; }
+  .bloco, .estrutura li { break-inside: avoid; box-shadow: none; }
+  .rodape { background: #fff !important; color: #000 !important; border-top: 1px solid #999; padding: 0.5cm 0 0; margin-top: 0.4cm; }
+  .rodape h2, .rodape p, .rodape li, .rodape a { color: #000 !important; }
+  .dica-rolagem { display: none !important; }
+  .so-impressao { display: block !important; }
+
+  /* Folha de bolso (1 página A4) */
+  .folha-bolso {
+    display: block !important;
+    break-after: page;
+    page-break-after: always;
+    font-size: 9.4pt;
+    color: #000 !important;
+  }
+  .folha-bolso h2, .folha-bolso h3 { color: #000 !important; margin: 0 0 0.12cm; }
+  .folha-bolso h2 { font-size: 17pt; }
+  .folha-bolso h3 { font-size: 11.5pt; margin-top: 0.24cm; }
+  .folha-bolso p { margin: 0 0 0.12cm; max-width: none; }
+  .bolso-cabeca { border-bottom: 1.5pt solid #000; padding-bottom: 0.15cm; margin-bottom: 0.1cm; }
+  .bolso-marca { font-size: 8.6pt; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .bolso-sub { font-size: 8.9pt; }
+  .bolso-tabela { min-width: 0 !important; width: 100%; font-size: 8.3pt; border: 1pt solid #444; margin: 0.05cm 0 0.18cm; }
+  .bolso-tabela caption { padding: 0.05cm 0.1cm; font-size: 8.2pt; font-weight: 700; }
+  .bolso-tabela th, .bolso-tabela td { padding: 0.07cm 0.16cm; border-bottom: 0.5pt solid #999; }
+  .bolso-tabela thead th { background: #e8e8e8 !important; color: #000 !important; font-size: 8.1pt; }
+  .bolso-tabela tbody tr:nth-child(even) { background: #f6f6f6 !important; }
+  .bolso-linha { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 0.35cm; align-items: start; }
+  .bolso-coluna h3 { margin-top: 0.1cm; }
+  .bolso-seguranca { margin: 0; padding-left: 0.35cm; font-size: 8.7pt; }
+  .bolso-seguranca li { margin: 0.06cm 0; }
+  .bolso-tabela td:nth-child(1) { white-space: nowrap; }
+
+  .no-quebra { break-inside: avoid; page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+<header class="cabecalho no-print">
+  <div class="container cabecalho-linha">
+    <p class="marca">Taichi <span>na</span> Cadeira</p>
+    <nav class="nav-principal" aria-label="Navegação principal">
+      <ul class="nav-lista">
+        <li><a href="#seguranca">Segurança</a></li>
+        <li><a href="#postura">Postura</a></li>
+        <li><a href="#movimentos">Movimentos</a></li>
+        <li><a href="#programa">Programa</a></li>
+        <li><a href="#mentor">Mentor</a></li>
+        <li><a href="#escritorio">Escritório</a></li>
+        <li><a href="#imprimir">Imprimir</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="conteudo">
+
+  <!-- ==================== FOLHA DE BOLSO (SOMENTE IMPRESSÃO) ==================== -->
+  <section class="folha-bolso so-impressao" aria-labelledby="bolso-titulo">
+    <header class="bolso-cabeca">
+      <p class="bolso-marca">Taichi na Cadeira</p>
+      <h2 id="bolso-titulo">Folha de bolso — resumo do programa</h2>
+      <p class="bolso-sub">8 semanas · 24 sessões · 20 a 30 minutos por sessão (aquecimento 5 min · sequência principal 15 a 20 min · resfriamento 5 min). Imprima, dobre e leve com você.</p>
+    </header>
+
+    <h3>Os 8 movimentos</h3>
+    <table class="bolso-tabela bolso-movimentos">
+      <caption>Resumo dos 8 movimentos: nome, respiração, repetições e dica curta</caption>
+      <thead>
+        <tr><th scope="col">Nº</th><th scope="col">Movimento</th><th scope="col">Respiração</th><th scope="col">Repetições</th><th scope="col">Dica de segurança</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Abertura (Preparação)</td><td>inspira 4s / expira 4s</td><td>6</td><td>Pés apoiados; pare se sentir tontura.</td></tr>
+        <tr><td>2</td><td>Mãos em Nuvem</td><td>inspira 4s / expira 4s</td><td>6 (3 por lado)</td><td>Não torça a lombar.</td></tr>
+        <tr><td>3</td><td>Separar a Crina do Cavalo Selvagem</td><td>inspira ao recolher / expira ao estender</td><td>6</td><td>Ombro que dói não sobe.</td></tr>
+        <tr><td>4</td><td>Ondear as Mãos como Nuvens</td><td>inspira ao subir / expira ao descer</td><td>6</td><td>Movimentos pequenos e lentos.</td></tr>
+        <tr><td>5</td><td>Afastar e Puxar (Aparar e Recuar)</td><td>inspira ao puxar / expira ao afastar</td><td>4</td><td>Não prenda a respiração.</td></tr>
+        <tr><td>6</td><td>Escovar o Joelho (adaptado)</td><td>inspira ao girar / expira ao empurrar</td><td>4 por lado</td><td>Joelho não passa da ponta do pé.</td></tr>
+        <tr><td>7</td><td>Calcanhar e Ponta do Pé</td><td>respiração contínua e lenta</td><td>10</td><td>Calçado firme; pare se houver cãibra.</td></tr>
+        <tr><td>8</td><td>Fechamento</td><td>inspira 4s / expira 6s</td><td>4</td><td>Levante-se devagar ao terminar.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="bolso-linha">
+      <div class="bolso-coluna">
+        <h3>Progressão semanal</h3>
+        <table class="bolso-tabela bolso-progressao">
+          <caption>Progressão das 8 semanas, em resumo</caption>
+          <thead>
+            <tr><th scope="col">Semanas</th><th scope="col">Conteúdo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1–2</td><td>Movimentos 1 a 4; postura e respiração.</td></tr>
+            <tr><td>3–4</td><td>Somam os movimentos 5 e 6 (1 a 6).</td></tr>
+            <tr><td>5–6</td><td>Somam 7 e 8 e começam o fluxo contínuo (1 a 8).</td></tr>
+            <tr><td>7–8</td><td>Sequência completa fluida + autonomia.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="bolso-coluna">
+        <h3>Lembretes de segurança</h3>
+        <ul class="bolso-seguranca">
+          <li>Cadeira firme, <strong>sem rodas</strong>; sem braços ou com braços baixos.</li>
+          <li><strong>Pés no chão</strong>, joelhos a aproximadamente 90° e coluna alongada.</li>
+          <li>Movimento lento e <strong>sem dor</strong>; pare se sentir tontura, dor no peito ou falta de ar.</li>
+          <li>Busque liberação médica em condições cardíacas, osteoporose grave ou pós-operatório recente.</li>
+          <li><strong>Este resumo não substitui avaliação médica ou fisioterapêutica.</strong></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== HERO ==================== -->
+  <section class="hero" aria-labelledby="hero-titulo">
+    <div class="container">
+      <div class="hero-grade">
+        <div>
+          <p class="hero-olho">Tai chi sentado · programa completo</p>
+          <h1 id="hero-titulo">Taichi na Cadeira</h1>
+          <p class="hero-sub">Um programa de tai chi sentado, em 8 semanas e 24 sessões, para idosos e pessoas com mobilidade reduzida ou em reabilitação. Movimentos lentos, respiração tranquila e segurança em primeiro lugar — no ritmo do seu corpo.</p>
+          <ul class="chips" aria-label="Resumo do programa">
+            <li>8 movimentos</li>
+            <li>8 semanas</li>
+            <li>24 sessões</li>
+            <li>20 a 30 min por sessão</li>
+            <li>Funciona offline</li>
+          </ul>
+          <div class="botoes">
+            <a class="botao botao-primario" href="#programa">Ver o programa de 8 semanas</a>
+            <a class="botao botao-secundario" href="#fluxo">Ir para o fluxo guiado</a>
+            <button class="botao botao-secundario js-imprimir" type="button">Imprimir / Salvar PDF</button>
+          </div>
+          <p class="nota-pequena">Este site abre direto no navegador, por duplo clique no arquivo. Não precisa de internet, instalação ou cadastro.</p>
+        </div>
+        <aside class="cartao-hero" aria-labelledby="como-comecar">
+          <h2 id="como-comecar">Como começar com segurança</h2>
+          <ol>
+            <li><strong>Ajuste a cadeira.</strong> Firme, sem rodas, com os pés no chão e os joelhos a aproximadamente 90°.</li>
+            <li><strong>Leia a segurança.</strong> Sinais de alerta e quando procurar liberação médica estão no início da página.</li>
+            <li><strong>Faça o movimento 1.</strong> Comece devagar, com metade das repetições e respiração calma.</li>
+          </ol>
+        </aside>
+      </div>
+
+      <div class="aviso-rapido" role="region" aria-label="Aviso rápido de segurança">
+        <span class="sinal" aria-hidden="true">!</span>
+        <p><strong>Antes de começar:</strong> cadeira firme e sem rodas, pés no chão, movimento lento e sem dor. Pare imediatamente se sentir tontura, dor no peito ou falta de ar. <a href="#seguranca">Ver todas as orientações de segurança</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SEGURANÇA ==================== -->
+  <section class="secao" id="seguranca" aria-labelledby="seguranca-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Leia primeiro</span>
+        <h2 id="seguranca-titulo">Segurança em primeiro lugar</h2>
+        <p>Taichi na cadeira é suave, mas exige preparo e atenção. Siga estas orientações em todas as sessões — inclusive quando se sentir bem.</p>
+      </div>
+
+      <div class="alerta-seguranca">
+        <h3>Pare imediatamente se sentir</h3>
+        <ul class="lista-parar">
+          <li><strong>tontura</strong> ou sensação de desmaio;</li>
+          <li><strong>dor no peito</strong> ou falta de ar;</li>
+          <li><strong>dor aguda</strong> em qualquer articulação;</li>
+          <li>visão embaralhada, suor frio ou batimento muito acelerado.</li>
+        </ul>
+        <p style="margin-top:1rem;margin-bottom:0">Ao parar, mantenha-se sentado, respire devagar e chame alguém se os sintomas não passarem. Procure atendimento médico se persistirem.</p>
+      </div>
+
+      <div class="grade-seguranca">
+        <div class="bloco">
+          <h3>Preparo da cadeira</h3>
+          <ul class="checklist">
+            <li><strong>Cadeira firme</strong>, estável e de preferência encostada na parede.</li>
+            <li><strong>Sem rodas</strong> — se a cadeira tiver rodas, trave-as antes de começar.</li>
+            <li><strong>Sem braços ou com braços baixos</strong>, para os braços se moverem livremente.</li>
+            <li><strong>Pés no chão</strong>, na largura do quadril; quadril apoiado no fundo do assento.</li>
+            <li>Espaço livre à frente e ao lado; nada de tapetes soltos ou objetos no caminho.</li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>Movimento seguro</h3>
+          <ul class="checklist">
+            <li><strong>Lento e sem dor:</strong> a amplitude é a que for confortável hoje.</li>
+            <li>Não force articulações nem prenda a respiração.</li>
+            <li>Faça pausas sempre que precisar; terminar antes também é sucesso.</li>
+            <li>Use roupas confortáveis e calçado firme (ou fique descalço em piso seguro).</li>
+            <li>Hidrate-se e evite praticar logo após refeições grandes.</li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>Quando buscar liberação profissional</h3>
+          <p>Converse com seu médico ou fisioterapeuta <strong>antes de iniciar</strong> se você tem ou teve:</p>
+          <ul>
+            <li>doença cardíaca, pressão alta sem controle ou arritmia;</li>
+            <li>osteoporose grave ou fratura recente;</li>
+            <li>cirurgia ou pós-operatório recente;</li>
+            <li>derrame (AVC) recente, Parkinson, demência ou tonturas frequentes;</li>
+            <li>dor intensa, hérnia ou lesão articular em tratamento.</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="legenda-escala" style="margin-top:1.5rem"><strong>Aviso importante:</strong> este site é educativo e de apoio à prática. Ele <strong>não substitui avaliação médica ou fisioterapêutica</strong>, nem serve para diagnosticar, tratar ou curar qualquer condição de saúde. Em caso de dúvida, procure um profissional.</p>
+    </div>
+  </section>
+
+  <!-- ==================== POSTURA ==================== -->
+  <section class="secao" id="postura" aria-labelledby="postura-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Base de todos os movimentos</span>
+        <h2 id="postura-titulo">Postura de base: sentado com segurança</h2>
+        <p>Antes do primeiro movimento, ajuste o corpo na cadeira. Use o diagrama e a lista abaixo como conferência rápida. Se precisar, deslize o diagrama para o lado no celular.</p>
+      </div>
+
+      <figure class="figura figura-postura" style="margin-bottom:1.5rem">
+        <div class="diagrama-rolagem">
+<svg viewBox="0 0 640 470" role="img" aria-labelledby="mv9-title mv9-desc" aria-label="Diagrama de postura sentada: pés apoiados no chão, joelhos a aproximadamente 90 graus, coluna alongada, ombros relaxados, queixo levemente recolhido, mãos soltas sobre as coxas e cadeira firme sem rodas.">
+  <title id="mv9-title">Diagrama de postura sentada: pés apoiados no chão, joelhos a aproximadamente 90 graus, coluna alongada, ombros relaxados, queixo levemente recolhido, mãos soltas sobre as coxas e cadeira firme sem rodas.</title>
+  <desc id="mv9-desc">Pessoa sentada de frente em uma cadeira, com linhas de chamada apontando para pés, joelhos, coluna, ombros, queixo, mãos e apoio da cadeira.</desc>
+  <line x1="100" y1="420" x2="540" y2="420" class="svg-chao"/>
+  <!-- cadeira -->
+  <rect x="250" y="90" width="140" height="192" rx="16" class="svg-cadeira"/>
+  <rect x="222" y="278" width="196" height="18" rx="9" class="svg-cadeira"/>
+  <rect x="234" y="296" width="14" height="110" rx="4" class="svg-cadeira-escura"/>
+  <rect x="396" y="296" width="14" height="110" rx="4" class="svg-cadeira-escura"/>
+  <line x1="242" y1="352" x2="404" y2="352" class="svg-cadeira-linha"/>
+  <!-- pessoa -->
+  <circle cx="320" cy="140" r="32" class="svg-cabeca"/>
+  <path d="M320 196 L320 262" stroke="#2f4b43" stroke-width="84" stroke-linecap="round" fill="none"/>
+  <!-- braços com contorno -->
+  <path d="M288 204 L262 250 L280 288" class="svg-braco"/>
+  <path d="M352 204 L378 250 L360 288" class="svg-braco"/>
+  <circle cx="280" cy="290" r="10" class="svg-mao" style="stroke:#fffdf8;stroke-width:3"/>
+  <circle cx="360" cy="290" r="10" class="svg-mao" style="stroke:#fffdf8;stroke-width:3"/>
+  <!-- coxas e pernas -->
+  <path d="M302 278 L266 314" stroke="#2f4b43" stroke-width="34" stroke-linecap="round" fill="none"/>
+  <path d="M338 278 L374 314" stroke="#2f4b43" stroke-width="34" stroke-linecap="round" fill="none"/>
+  <path d="M266 316 L260 386" stroke="#2f4b43" stroke-width="24" stroke-linecap="round" fill="none"/>
+  <path d="M374 316 L380 386" stroke="#2f4b43" stroke-width="24" stroke-linecap="round" fill="none"/>
+  <ellipse cx="248" cy="395" rx="28" ry="11" class="svg-cabeca"/>
+  <ellipse cx="392" cy="395" rx="28" ry="11" class="svg-cabeca"/>
+  <!-- rótulos com guias -->
+  <rect x="8" y="330" width="216" height="40" rx="10" class="svg-caixa"/>
+  <text x="24" y="356" class="svg-rotulo-caixa">pés apoiados no chão</text>
+  <path d="M216 350 L246 393" class="svg-linha-guia"/>
+  <circle cx="247" cy="394" r="5" class="svg-ponto"/>
+
+  <rect x="8" y="272" width="216" height="40" rx="10" class="svg-caixa"/>
+  <text x="24" y="298" class="svg-rotulo-caixa">joelhos ≈ 90°</text>
+  <path d="M216 292 L262 315" class="svg-linha-guia"/>
+  <circle cx="265" cy="316" r="5" class="svg-ponto"/>
+
+  <rect x="8" y="214" width="216" height="40" rx="10" class="svg-caixa"/>
+  <text x="24" y="240" class="svg-rotulo-caixa">coluna alongada</text>
+  <path d="M216 234 L296 246" class="svg-linha-guia"/>
+  <circle cx="299" cy="246" r="5" class="svg-ponto"/>
+
+  <rect x="404" y="120" width="228" height="40" rx="10" class="svg-caixa"/>
+  <text x="420" y="146" class="svg-rotulo-caixa">queixo recolhido</text>
+  <path d="M404 140 L346 166" class="svg-linha-guia"/>
+  <circle cx="344" cy="167" r="5" class="svg-ponto"/>
+
+  <rect x="404" y="180" width="228" height="40" rx="10" class="svg-caixa"/>
+  <text x="420" y="206" class="svg-rotulo-caixa">ombros relaxados</text>
+  <path d="M404 200 L366 206" class="svg-linha-guia"/>
+  <circle cx="363" cy="207" r="5" class="svg-ponto"/>
+
+  <rect x="404" y="240" width="228" height="40" rx="10" class="svg-caixa"/>
+  <text x="420" y="266" class="svg-rotulo-caixa">mãos soltas</text>
+  <path d="M404 260 L370 286" class="svg-linha-guia"/>
+  <circle cx="367" cy="288" r="5" class="svg-ponto"/>
+
+  <rect x="404" y="330" width="228" height="40" rx="10" class="svg-caixa"/>
+  <text x="420" y="356" class="svg-rotulo-caixa">apoio firme, sem rodas</text>
+  <path d="M404 350 L404 352" class="svg-linha-guia"/>
+  <circle cx="404" cy="352" r="5" class="svg-ponto"/>
+</svg>
+        </div>
+        <figcaption>Diagrama de postura sentada: pés apoiados, joelhos a aproximadamente 90°, coluna alongada, ombros relaxados, queixo levemente recolhido, mãos soltas sobre as coxas e cadeira firme, sem rodas.</figcaption>
+      </figure>
+
+      <div class="blocos">
+        <div class="bloco">
+          <h3>Lista de conferência da postura</h3>
+          <ol>
+            <li><strong>Pés apoiados no chão</strong>, na largura do quadril.</li>
+            <li><strong>Joelhos a aproximadamente 90°</strong> — se possível, o quadril um pouco acima dos joelhos.</li>
+            <li><strong>Coluna alongada</strong>, sem arquear: imagine o topo da cabeça subindo.</li>
+            <li><strong>Ombros relaxados</strong>, longe das orelhas.</li>
+            <li><strong>Queixo levemente recolhido</strong>, olhar no horizonte.</li>
+            <li><strong>Mãos soltas sobre as coxas</strong>, dedos relaxados.</li>
+            <li><strong>Cadeira firme e sem rodas</strong>, quadril apoiado no fundo do assento.</li>
+          </ol>
+        </div>
+        <div class="bloco">
+          <h3>Como ajustar na prática</h3>
+          <ul>
+            <li>Se os pés não alcançam o chão, use um apoio firme sob os pés (livro grosso ou banquinho).</li>
+            <li>Se a cadeira for muito alta, prefira outra mais baixa: coxas mais paralelas ao chão.</li>
+            <li>Incline levemente o queixo e alongue a nuca — não abaixe a cabeça.</li>
+            <li>Relaxe a mandíbula e a língua; respire pelo nariz.</li>
+            <li>Faça uma pausa de 10 segundos nessa postura antes de começar cada sessão.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- ==================== MOVIMENTOS ==================== -->
+  <section class="secao" id="movimentos" aria-labelledby="movimentos-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Sequência principal</span>
+        <h2 id="movimentos-titulo">Os 8 movimentos, um a um</h2>
+        <p>Cada cartão traz a postura inicial (em cinza) e final (em verde escuro), as setas de direção, o passo a passo, a respiração, as repetições e uma dica de segurança. Comece pelos movimentos 1 e 2.</p>
+      </div>
+
+      <div class="painel-fluxo no-print" id="fluxo" aria-labelledby="fluxo-titulo">
+        <h3 id="fluxo-titulo">Modo de fluxo contínuo (opcional)</h3>
+        <p>Deixe o site conduzir a prática: ele percorre os <strong>8 movimentos</strong> na ordem, mostra a contagem de respiração, destaca o cartão atual e avança sozinho. Você pode pausar, avançar ou encerrar quando quiser. Duração aproximada: 7 a 10 minutos.</p>
+        <div class="fluxo-controles">
+          <button class="botao botao-claro" type="button" id="btn-fluxo">Iniciar fluxo</button>
+          <button class="botao botao-contorno" type="button" id="btn-pausar" disabled>Pausar</button>
+          <button class="botao botao-contorno" type="button" id="btn-avancar" disabled>Avançar movimento</button>
+          <button class="botao botao-contorno" type="button" id="btn-parar" disabled>Encerrar</button>
+        </div>
+        <p class="fluxo-status" id="fluxo-status" role="status" aria-live="polite" aria-atomic="true">Fluxo parado. Toque em “Iniciar fluxo” para começar.</p>
+        <p class="fluxo-tempo" id="fluxo-tempo" aria-hidden="true">Aguardando início.</p>
+        <p class="nota-pequena">A contagem é apenas um guia: se a respiração pedir outro ritmo, siga o seu corpo. Leia a seção de segurança antes de começar.</p>
+      </div>
+
+      <div class="grade-movimentos">
+
+        <!-- Movimento 1 -->
+        <article class="cartao movimento" id="mov1" data-movement="1" aria-labelledby="mov1-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">1</span>
+            <div>
+              <h3 id="mov1-nome">Abertura (Preparação)</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">起势</span> / Qǐ Shì <span class="traducao">(Commencement)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv1-title mv1-desc" aria-label="Ilustração do movimento Abertura: pessoa sentada em cadeira sem rodas, com os braços baixos no início (em cinza) e estendidos à frente na altura dos ombros no final (em verde escuro), com seta apontando para cima.">
+  <title id="mv1-title">Ilustração do movimento Abertura: pessoa sentada em cadeira sem rodas, com os braços baixos no início (em cinza) e estendidos à frente na altura dos ombros no final (em verde escuro), com seta apontando para cima.</title>
+  <desc id="mv1-desc">Figura de perfil, sentada, com pés apoiados no chão. A postura inicial mostra as mãos sobre as coxas; a final mostra os braços à frente. Uma seta curva indica a subida dos braços.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="248" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: braços baixos, à frente do tronco -->
+  <path d="M170 106 L188 124 L184 146" class="svg-fantasma"/>
+  <!-- final: braços à frente na altura dos ombros -->
+  <path d="M168 104 L198 108 L228 108" class="svg-braco"/>
+  <circle cx="230" cy="108" r="5" class="svg-mao"/>
+  <path d="M214 158 Q 232 140 230 122" class="svg-seta"/>
+  <path d="M224 130 L230 121 L236 130" class="svg-seta"/>
+</svg>
+            <figcaption>Postura inicial em cinza e final em verde escuro; a seta indica o movimento de subida dos braços.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Sente-se com os pés na largura do quadril e as mãos soltas sobre as coxas, palmas para baixo.</li>
+            <li>Inspire pelo nariz por 4 segundos e, devagar, leve os braços estendidos à frente até a altura dos ombros.</li>
+            <li>Expire por 4 segundos e desça os braços com suavidade, como se apoiassem o ar.</li>
+            <li>Repita 6 vezes, mantendo o tronco ereto e os ombros relaxados.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira 4s / expira 4s</dd></div>
+            <div><dt>Repetições</dt><dd>6</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> mantenha os pés apoiados e a cadeira sem rodas; se sentir tontura, pare e respire normalmente.</p>
+        </article>
+
+        <!-- Movimento 2 -->
+        <article class="cartao movimento" id="mov2" data-movement="2" aria-labelledby="mov2-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">2</span>
+            <div>
+              <h3 id="mov2-nome">Mãos em Nuvem</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">云手</span> / Yún Shǒu <span class="traducao">(Cloud Hands)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv2-title mv2-desc" aria-label="Ilustração do movimento Mãos em Nuvem: pessoa sentada de frente, com uma mão no alto no início (em cinza) e os antebraços cruzados à frente do peito no final, com arco indicando o movimento circular.">
+  <title id="mv2-title">Ilustração do movimento Mãos em Nuvem: pessoa sentada de frente, com uma mão no alto no início (em cinza) e os antebraços cruzados à frente do peito no final, com arco indicando o movimento circular.</title>
+  <desc id="mv2-desc">Figura sentada de frente em uma cadeira firme. A mão em cinza mostra o ponto de partida; os braços cruzados mostram a posição final; a seta curva indica a direção do círculo.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="222" x2="252" y2="222" class="svg-chao"/>
+  <rect x="116" y="76" width="88" height="76" rx="12" class="svg-cadeira"/>
+  <rect x="110" y="148" width="100" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="118" y="161" width="10" height="52" rx="3" class="svg-cadeira-escura"/>
+  <rect x="192" y="161" width="10" height="52" rx="3" class="svg-cadeira-escura"/>
+  <line x1="123" y1="190" x2="192" y2="190" class="svg-cadeira-linha"/>
+  <path d="M160 98 L160 146" stroke="#2f4b43" stroke-width="46" stroke-linecap="round" fill="none"/>
+  <circle cx="160" cy="66" r="16" class="svg-cabeca"/>
+  <path d="M144 150 L130 162" class="svg-coxa"/>
+  <path d="M176 150 L190 162" class="svg-coxa"/>
+  <path d="M130 162 L127 204" class="svg-perna"/>
+  <path d="M190 162 L193 204" class="svg-perna"/>
+  <ellipse cx="122" cy="209" rx="14" ry="6" class="svg-cabeca"/>
+  <ellipse cx="198" cy="209" rx="14" ry="6" class="svg-cabeca"/>
+  <!-- fantasma: mão no alto do lado direito -->
+  <path d="M184 106 L202 120 L194 104" class="svg-fantasma"/>
+  <!-- final: braços cruzados à frente do peito -->
+  <path d="M184 106 L198 130 L154 140" class="svg-braco"/>
+  <path d="M136 106 L120 128 L148 112" class="svg-braco"/>
+  <circle cx="152" cy="141" r="5" class="svg-mao"/>
+  <circle cx="146" cy="111" r="5" class="svg-mao"/>
+  <!-- arco de nuvem, do início ao final -->
+  <path d="M204 96 Q 190 82 164 90 Q 150 94 144 104" class="svg-seta"/>
+  <path d="M152 96 L143 104 L153 109" class="svg-seta"/>
+</svg>
+            <figcaption>Vista de frente: a mão em cinza mostra o início do círculo e as mãos cruzadas mostram o final, com a seta curva do movimento.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Sentado, com a coluna alongada, traga as mãos à frente do peito, com as palmas viradas para você.</li>
+            <li>Desenhe um círculo lento com uma mão à frente do peito enquanto a outra acompanha perto do abdômen.</li>
+            <li>Transfira suavemente o peso do quadril de um lado para o outro, sem levantar os pés.</li>
+            <li>Troque as mãos de posição e repita 3 vezes de cada lado (6 no total).</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira 4s / expira 4s</dd></div>
+            <div><dt>Repetições</dt><dd>6 (3 por lado)</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> não force a rotação do tronco — o movimento vem dos braços e da intenção, sem torcer a lombar.</p>
+        </article>
+
+        <!-- Movimento 3 -->
+        <article class="cartao movimento" id="mov3" data-movement="3" aria-labelledby="mov3-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">3</span>
+            <div>
+              <h3 id="mov3-nome">Separar a Crina do Cavalo Selvagem</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">野马分鬃</span> / Yěmǎ Fēnzōng <span class="traducao">(Parting Wild Horse's Mane)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv3-title mv3-desc" aria-label="Ilustração do movimento Separar a Crina do Cavalo Selvagem: pessoa sentada de perfil, com os braços recolhidos no início (em cinza) e abertos em diagonal no final, um para cima e à frente e o outro para baixo e atrás, com setas opostas.">
+  <title id="mv3-title">Ilustração do movimento Separar a Crina do Cavalo Selvagem: pessoa sentada de perfil, com os braços recolhidos no início (em cinza) e abertos em diagonal no final, um para cima e à frente e o outro para baixo e atrás, com setas opostas.</title>
+  <desc id="mv3-desc">Figura de perfil, sentada. Uma seta diagonal sobe à frente e outra desce atrás, mostrando a separação dos braços.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="248" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: mãos recolhidas ao centro -->
+  <path d="M168 106 L184 118 L190 132" class="svg-fantasma"/>
+  <path d="M168 106 L180 126 L186 140" class="svg-fantasma"/>
+  <!-- final: um braço sobe à frente, outro desce atrás -->
+  <path d="M168 104 L196 110 L224 96" class="svg-braco"/>
+  <circle cx="227" cy="95" r="5" class="svg-mao"/>
+  <path d="M168 106 L146 126 L128 146" class="svg-braco"/>
+  <circle cx="126" cy="148" r="5" class="svg-mao"/>
+  <path d="M208 152 Q 228 134 232 112" class="svg-seta"/>
+  <path d="M226 120 L232 111 L238 120" class="svg-seta"/>
+  <path d="M150 118 Q 136 136 128 156" class="svg-seta"/>
+  <path d="M134 148 L128 157 L122 147" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: braços recolhidos no início (cinza) e abertos em diagonal no final, com setas opostas mostrando a separação.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Recolha as mãos à frente do corpo, na altura do peito, como se segurasse uma bola.</li>
+            <li>Inspire e leve um braço para cima e à frente, com a mão aberta na altura do ombro.</li>
+            <li>Expire e estenda o outro braço para baixo e para trás, em diagonal, mantendo o cotovelo macio.</li>
+            <li>Retorne ao centro e repita, alternando os lados, 3 vezes de cada lado (6 no total).</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira ao recolher / expira ao estender</dd></div>
+            <div><dt>Repetições</dt><dd>6</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> ombro que dói não sobe — reduza a altura do braço e mantenha o pescoço longo.</p>
+        </article>
+
+        <!-- Movimento 4 -->
+        <article class="cartao movimento" id="mov4" data-movement="4" aria-labelledby="mov4-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">4</span>
+            <div>
+              <h3 id="mov4-nome">Ondear as Mãos como Nuvens</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">云手变式</span> / Wave Hands Like Clouds</p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv4-title mv4-desc" aria-label="Ilustração do movimento Ondear as Mãos como Nuvens: pessoa sentada de perfil, com os braços baixos no início (em cinza) e ondulando para cima e para baixo no final, com seta ondulada.">
+  <title id="mv4-title">Ilustração do movimento Ondear as Mãos como Nuvens: pessoa sentada de perfil, com os braços baixos no início (em cinza) e ondulando para cima e para baixo no final, com seta ondulada.</title>
+  <desc id="mv4-desc">Figura de perfil, sentada, com os braços à frente em duas alturas diferentes. A seta em forma de onda indica o sobe e desce contínuo.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="248" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: braços baixos à frente -->
+  <path d="M168 106 L196 124 L222 140" class="svg-fantasma"/>
+  <path d="M168 106 L192 130 L214 146" class="svg-fantasma"/>
+  <!-- final: um braço alto e outro baixo -->
+  <path d="M168 104 L196 104 L224 96" class="svg-braco"/>
+  <circle cx="227" cy="95" r="5" class="svg-mao"/>
+  <path d="M168 108 L196 120 L222 126" class="svg-braco"/>
+  <circle cx="225" cy="127" r="5" class="svg-mao"/>
+  <!-- seta ondulada -->
+  <path d="M236 160 C 224 148 248 136 236 124 C 224 112 248 100 236 88" class="svg-seta"/>
+  <path d="M230 96 L236 87 L242 96" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: braços baixos no início (cinza), ondulando para cima e para baixo no final, com a seta ondulada do movimento.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Leve os dois braços à frente do corpo, na altura do peito, com as palmas para baixo.</li>
+            <li>Inspire ao subir as mãos em uma onda suave, sem tensionar os ombros.</li>
+            <li>Expire ao descer as mãos em outra onda, mantendo o movimento contínuo e lento.</li>
+            <li>Repita 6 ondas, com uma pausa curta e a respiração tranquila entre elas.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira ao subir / expira ao descer</dd></div>
+            <div><dt>Repetições</dt><dd>6</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> movimentos pequenos e lentos; se perder o equilíbrio, apoie as mãos nas coxas.</p>
+        </article>
+
+        <!-- Movimento 5 -->
+        <article class="cartao movimento" id="mov5" data-movement="5" aria-labelledby="mov5-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">5</span>
+            <div>
+              <h3 id="mov5-nome">Afastar e Puxar (Aparar e Recuar)</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">掤捋</span> / Péng e Lǚ <span class="traducao">(Ward Off + Rollback)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv5-title mv5-desc" aria-label="Ilustração do movimento Afastar e Puxar: pessoa sentada de perfil, com a mão recolhida no início (em cinza) e o braço afastando à frente no final, com seta dupla horizontal indicando puxar e afastar.">
+  <title id="mv5-title">Ilustração do movimento Afastar e Puxar: pessoa sentada de perfil, com a mão recolhida no início (em cinza) e o braço afastando à frente no final, com seta dupla horizontal indicando puxar e afastar.</title>
+  <desc id="mv5-desc">Figura de perfil, sentada. A seta de duas pontas mostra os dois sentidos do movimento: puxar para junto do tronco e afastar à frente.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="258" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: mão puxada ao peito -->
+  <path d="M168 106 L188 120 L192 136" class="svg-fantasma"/>
+  <!-- final: braço à frente aparando, outro recolhido junto ao tronco -->
+  <path d="M168 104 L196 116 L226 128" class="svg-braco"/>
+  <circle cx="229" cy="129" r="5" class="svg-mao"/>
+  <path d="M229 121 L229 137" class="svg-braco" stroke-width="3"/>
+  <path d="M168 108 L150 128 L138 150" class="svg-braco"/>
+  <circle cx="137" cy="152" r="5" class="svg-mao"/>
+  <!-- seta dupla: afastar (expira) e puxar (inspira) -->
+  <path d="M214 168 L258 168" class="svg-seta"/>
+  <path d="M250 162 L259 168 L250 174" class="svg-seta"/>
+  <path d="M222 162 L213 168 L222 174" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: mão recolhida no início (cinza) e braço afastando à frente no final, com seta dupla indicando puxar e afastar.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Traga as mãos à frente do peito, cotovelos baixos e ombros relaxados.</li>
+            <li>Inspire ao puxar as mãos para junto do tronco, como quem recolhe algo macio.</li>
+            <li>Expire ao afastar uma mão à frente, com a palma voltada para fora, sem esticar o cotovelo.</li>
+            <li>Repita 4 vezes, alternando a mão que afasta e mantendo o tronco ereto.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira ao puxar / expira ao afastar</dd></div>
+            <div><dt>Repetições</dt><dd>4</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> não trave a respiração ao empurrar; mantenha o queixo recolhido e a coluna ereta.</p>
+        </article>
+
+        <!-- Movimento 6 -->
+        <article class="cartao movimento" id="mov6" data-movement="6" aria-labelledby="mov6-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">6</span>
+            <div>
+              <h3 id="mov6-nome">Escovar o Joelho (adaptado)</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">搂膝拗步</span> / Lōu Xī Ào Bù <span class="traducao">(Brush Knee)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv6-title mv6-desc" aria-label="Ilustração do movimento Escovar o Joelho: pessoa sentada de perfil, com a mão ao peito no início (em cinza) e, no final, uma mão passando sobre o joelho enquanto a outra empurra à frente, com setas.">
+  <title id="mv6-title">Ilustração do movimento Escovar o Joelho: pessoa sentada de perfil, com a mão ao peito no início (em cinza) e, no final, uma mão passando sobre o joelho enquanto a outra empurra à frente, com setas.</title>
+  <desc id="mv6-desc">Figura de perfil, sentada. Uma seta curva acompanha a mão que escova o joelho; uma seta reta mostra o empurrão à frente.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="258" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: mão ao peito -->
+  <path d="M168 106 L190 122 L196 140" class="svg-fantasma"/>
+  <!-- final: escova o joelho e empurra à frente -->
+  <path d="M168 104 L182 132 L200 148" class="svg-braco"/>
+  <circle cx="203" cy="149" r="5" class="svg-mao"/>
+  <path d="M168 108 L198 116 L226 112" class="svg-braco"/>
+  <circle cx="229" cy="112" r="5" class="svg-mao"/>
+  <!-- seta do empurrão -->
+  <path d="M220 138 L252 138" class="svg-seta"/>
+  <path d="M244 132 L253 138 L244 144" class="svg-seta"/>
+  <!-- arco da escovada sobre o joelho -->
+  <path d="M198 108 Q 220 128 206 150" class="svg-seta"/>
+  <path d="M199 143 L206 151 L212 142" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: mão ao peito no início (cinza) e, no final, uma mão escova o joelho enquanto a outra empurra à frente.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Gire levemente o tronco para um lado, sem mover os quadris da cadeira.</li>
+            <li>Inspire ao recolher uma mão ao peito e deixar a outra pronta para descer.</li>
+            <li>Expire ao passar a mão sobre o joelho, de cima para baixo, e empurrar a outra à frente.</li>
+            <li>Volte ao centro e troque de lado; faça 4 repetições por lado.</li>
+            <li>Mantenha o joelho apontado para a frente e o pé inteiro no chão.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira ao girar / expira ao empurrar</dd></div>
+            <div><dt>Repetições</dt><dd>4 por lado</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> não deixe o joelho passar além da ponta do pé; use cadeira sem rodas e com encosto.</p>
+        </article>
+
+        <!-- Movimento 7 -->
+        <article class="cartao movimento" id="mov7" data-movement="7" aria-labelledby="mov7-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">7</span>
+            <div>
+              <h3 id="mov7-nome">Calcanhar e Ponta do Pé</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">提踵</span> / Heel and Toe Raises</p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv7-title mv7-desc" aria-label="Ilustração do movimento Calcanhar e Ponta do Pé: pessoa sentada de perfil, com os pés apoiados e indicações do calcanhar e da ponta do pé elevados, com setas para cima.">
+  <title id="mv7-title">Ilustração do movimento Calcanhar e Ponta do Pé: pessoa sentada de perfil, com os pés apoiados e indicações do calcanhar e da ponta do pé elevados, com setas para cima.</title>
+  <desc id="mv7-desc">Figura de perfil, sentada, com os pés no chão. Os traços em cinza mostram o calcanhar elevado e a ponta elevada; as setas indicam as duas fases.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="258" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M168 106 L182 126 L176 146" class="svg-braco"/>
+  <circle cx="175" cy="148" r="5" class="svg-mao"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <!-- fantasma: calcanhar sobe (pivô na ponta) -->
+  <path d="M228 207 L199 191" class="svg-fantasma"/>
+  <!-- fantasma: ponta sobe (pivô no calcanhar) -->
+  <path d="M198 203 L228 193" class="svg-fantasma"/>
+  <!-- pé final apoiado no chão -->
+  <path d="M199 203 L231 207" class="svg-pe"/>
+  <ellipse cx="235" cy="205" rx="9" ry="5" class="svg-cabeca"/>
+  <!-- rótulos e setas: calcanhar e ponta sobem -->
+  <text x="166" y="173" text-anchor="middle" class="svg-rotulo" style="font-size:11px">calcanhar</text>
+  <text x="266" y="173" text-anchor="middle" class="svg-rotulo" style="font-size:11px">ponta do pé</text>
+  <path d="M190 205 L190 191" class="svg-seta"/>
+  <path d="M184 198 L190 189 L196 198" class="svg-seta"/>
+  <path d="M246 205 L246 191" class="svg-seta"/>
+  <path d="M240 198 L246 189 L252 198" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: os pés em cinza mostram o calcanhar e a ponta elevados; as setas indicam as duas fases, com o pé apoiado como final.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Sente-se com os pés apoiados e as mãos soltas (ou apoiadas nas coxas).</li>
+            <li>Eleve os calcanhares, mantendo a ponta dos pés no chão, e desça devagar.</li>
+            <li>Eleve a ponta dos pés, mantendo os calcanhares no chão, e desça devagar.</li>
+            <li>Alterne os dois movimentos 10 vezes, com respiração contínua e lenta.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>respiração contínua e lenta</dd></div>
+            <div><dt>Repetições</dt><dd>10</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> faça sentado e com calçado firme; pare se sentir cãibra, formigamento forte ou tontura.</p>
+        </article>
+
+        <!-- Movimento 8 -->
+        <article class="cartao movimento" id="mov8" data-movement="8" aria-labelledby="mov8-nome">
+          <header class="cartao-topo">
+            <span class="numero" aria-hidden="true">8</span>
+            <div>
+              <h3 id="mov8-nome">Fechamento</h3>
+              <p class="chines"><span class="hanzi" lang="zh-Hans">收势</span> / Shōu Shì <span class="traducao">(Closing)</span></p>
+            </div>
+          </header>
+          <figure class="figura">
+            <svg viewBox="0 0 320 240" role="img" aria-labelledby="mv8-title mv8-desc" aria-label="Ilustração do movimento Fechamento: pessoa sentada de perfil, com os braços elevados no início (em cinza) e as mãos descansando nas coxas no final, com seta para baixo.">
+  <title id="mv8-title">Ilustração do movimento Fechamento: pessoa sentada de perfil, com os braços elevados no início (em cinza) e as mãos descansando nas coxas no final, com seta para baixo.</title>
+  <desc id="mv8-desc">Figura de perfil, sentada. Os braços em cinza mostram o início elevado; a seta indica a descida até as coxas, onde as mãos repousam.</desc>
+  <g class="svg-legenda">
+    <circle cx="24" cy="18" r="5" class="svg-ponto-fantasma"/><text x="34" y="22" class="svg-rotulo">início</text>
+    <circle cx="92" cy="18" r="5" class="svg-mao"/><text x="102" y="22" class="svg-rotulo">final</text>
+  </g>
+  <line x1="78" y1="217" x2="248" y2="217" class="svg-chao"/>
+  <rect x="108" y="88" width="13" height="78" rx="6" class="svg-cadeira"/>
+  <rect x="106" y="150" width="104" height="13" rx="5" class="svg-cadeira"/>
+  <rect x="113" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <rect x="196" y="163" width="10" height="50" rx="3" class="svg-cadeira-escura"/>
+  <line x1="118" y1="190" x2="196" y2="190" class="svg-cadeira-linha"/>
+  <path d="M170 92 L162 150" class="svg-corpo"/>
+  <circle cx="173" cy="72" r="15" class="svg-cabeca"/>
+  <path d="M162 150 L199 150" class="svg-coxa"/>
+  <path d="M199 151 L201 197" class="svg-perna"/>
+  <path d="M201 198 L214 201" class="svg-pe"/>
+  <!-- fantasma: braços elevados à frente -->
+  <path d="M168 104 L198 108 L226 104" class="svg-fantasma"/>
+  <!-- final: mãos repousam nas coxas -->
+  <path d="M168 106 L180 128 L174 148" class="svg-braco"/>
+  <circle cx="173" cy="150" r="5" class="svg-mao"/>
+  <!-- seta descendo -->
+  <path d="M220 120 Q 236 138 228 160" class="svg-seta"/>
+  <path d="M222 152 L228 161 L234 152" class="svg-seta"/>
+</svg>
+            <figcaption>De perfil: braços elevados no início (cinza) descendo até as coxas no final, com seta descendente.</figcaption>
+          </figure>
+          <h4 class="rotulo-passos">Como fazer</h4>
+          <ol class="passos">
+            <li>Inspire por 4 segundos e eleve suavemente as mãos à frente, na altura do abdômen.</li>
+            <li>Expire por 6 segundos e desça as mãos até descansarem nas coxas.</li>
+            <li>Permaneça sentado, sentindo os pés no chão e a respiração natural, por alguns segundos.</li>
+            <li>Repita 4 vezes, terminando com as mãos soltas e o corpo relaxado.</li>
+          </ol>
+          <dl class="dados">
+            <div><dt>Respiração</dt><dd>inspira 4s / expira 6s</dd></div>
+            <div><dt>Repetições</dt><dd>4</dd></div>
+          </dl>
+          <p class="dica"><strong>Dica de segurança:</strong> termine com os pés no chão e as mãos nas coxas; levante-se devagar, sem pressa.</p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+  <!-- ==================== PROGRAMA ==================== -->
+  <section class="secao" id="programa" aria-labelledby="programa-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Plano de 8 semanas</span>
+        <h2 id="programa-titulo">Programa completo: 8 semanas, 24 sessões</h2>
+        <p><strong>8 semanas · 3 sessões por semana · 24 sessões · 20 a 30 minutos cada.</strong> A progressão é gradual: nas duas primeiras semanas você aprende os movimentos 1 a 4; depois soma 5 e 6; em seguida 7 e 8; e nas últimas semanas pratica a sequência completa, em fluxo, com autonomia.</p>
+      </div>
+
+      <h3>Como é cada sessão (20 a 30 minutos)</h3>
+      <ul class="estrutura">
+        <li>
+          <strong>Aquecimento</strong>
+          <span class="tempo">5 minutos</span>
+          Respiração lenta, rotações suaves de pescoço e ombros e círculos de tornozelo. Sempre devagar e sem dor.
+        </li>
+        <li>
+          <strong>Sequência principal</strong>
+          <span class="tempo">15 a 20 minutos</span>
+          Os 8 movimentos em fluxo, na ordem 1 → 8, com a respiração e as repetições do cartão. Pausas curtas quando precisar.
+        </li>
+        <li>
+          <strong>Resfriamento</strong>
+          <span class="tempo">5 minutos</span>
+          Respiração tranquila e varredura corporal: pés, pernas, quadril, coluna, ombros e rosto relaxando.
+        </li>
+      </ul>
+
+      <h3>Progressão semana a semana</h3>
+      <div class="tabela-rolagem" tabindex="0" role="region" aria-label="Tabela de progressão semanal, 8 semanas e 24 sessões">
+        <table class="tabela-semanas">
+          <caption>Progressão das 8 semanas — movimentos e dose de cada semana</caption>
+          <thead>
+            <tr>
+              <th scope="col">Semana</th>
+              <th scope="col">Sessões</th>
+              <th scope="col">Movimentos</th>
+              <th scope="col">Foco e dose da semana</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-week="1">
+              <th scope="row">Semana 1</th>
+              <td>1 a 3</td>
+              <td>Movimentos 1 a 4</td>
+              <td>Aprender a postura e a respiração. Dose: 2 repetições lentas de cada movimento, com pausas.</td>
+            </tr>
+            <tr data-week="2">
+              <th scope="row">Semana 2</th>
+              <td>4 a 6</td>
+              <td>Movimentos 1 a 4</td>
+              <td>Repetições completas do cartão. Foco em coordenar inspira e expira sem prender a respiração.</td>
+            </tr>
+            <tr data-week="3">
+              <th scope="row">Semana 3</th>
+              <td>7 a 9</td>
+              <td>Movimentos 1 a 6</td>
+              <td>Somar 5 e 6. Ritmo mais lento, amplitude pequena e correção de ombros e joelhos.</td>
+            </tr>
+            <tr data-week="4">
+              <th scope="row">Semana 4</th>
+              <td>10 a 12</td>
+              <td>Movimentos 1 a 6</td>
+              <td>Consolidar 1 a 6. Dose: repetições completas quando o movimento estiver confortável e sem dor.</td>
+            </tr>
+            <tr data-week="5">
+              <th scope="row">Semana 5</th>
+              <td>13 a 15</td>
+              <td>Movimentos 1 a 8</td>
+              <td>Somar 7 e 8 e começar o fluxo contínuo, com pausas de 20 a 30 segundos entre os movimentos.</td>
+            </tr>
+            <tr data-week="6">
+              <th scope="row">Semana 6</th>
+              <td>16 a 18</td>
+              <td>Movimentos 1 a 8</td>
+              <td>Sequência 1 a 8 com pausas curtas, iniciando o fluxo contínuo.</td>
+            </tr>
+            <tr data-week="7">
+              <th scope="row">Semana 7</th>
+              <td>19 a 21</td>
+              <td>Movimentos 1 a 8</td>
+              <td>Sequência completa fluida: reduzir as pausas e manter a respiração calma do início ao fim.</td>
+            </tr>
+            <tr data-week="8">
+              <th scope="row">Semana 8</th>
+              <td>22 a 24</td>
+              <td>Sequência completa</td>
+              <td>Sequência completa fluida e autonomia: o praticante conduz a sessão e o mentor apenas observa uma delas.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+<p class="dica-rolagem">Deslize a tabela para o lado para ver todas as colunas.</p>
+
+      <h3>As 24 sessões, uma a uma</h3>
+      <p>Use esta tabela como agenda. Ela mantém o total de <strong>24 sessões em 8 semanas</strong> e mostra o foco e a dose de cada encontro.</p>
+      <div class="tabela-rolagem" tabindex="0" role="region" aria-label="Tabela das 24 sessões, com semana, foco e dose">
+        <table class="tabela-sessoes">
+          <caption>As 24 sessões do programa — foco e dose de cada sessão</caption>
+          <thead>
+            <tr>
+              <th scope="col">Sessão</th>
+              <th scope="col">Semana</th>
+              <th scope="col">Foco principal</th>
+              <th scope="col">Dose e atenção</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-session="1" data-week="1"><td class="num-sessao">1</td><td>1</td><td>Conhecer os movimentos 1 e 2</td><td>Postura base e respiração; 2 repetições de cada.</td></tr>
+            <tr data-session="2" data-week="1"><td class="num-sessao">2</td><td>1</td><td>Movimentos 1 a 3</td><td>Respiração 4s/4s; 2 repetições, pausas de 30 segundos.</td></tr>
+            <tr data-session="3" data-week="1"><td class="num-sessao">3</td><td>1</td><td>Movimentos 1 a 4</td><td>3 repetições; conferir pés apoiados e joelhos a 90°.</td></tr>
+            <tr data-session="4" data-week="2"><td class="num-sessao">4</td><td>2</td><td>Revisão dos movimentos 1 a 4</td><td>4 repetições; alongar a expiração sem forçar.</td></tr>
+            <tr data-session="5" data-week="2"><td class="num-sessao">5</td><td>2</td><td>Movimentos 1 a 4 em sequência</td><td>4 repetições; sem pausa entre as repetições do mesmo movimento.</td></tr>
+            <tr data-session="6" data-week="2"><td class="num-sessao">6</td><td>2</td><td>Ritmo e respiração 1 a 4</td><td>6 repetições quando confortável; ombros longe das orelhas.</td></tr>
+            <tr data-session="7" data-week="3"><td class="num-sessao">7</td><td>3</td><td>Introduzir o movimento 5</td><td>2 repetições do 5; revisar 1 a 4 com calma.</td></tr>
+            <tr data-session="8" data-week="3"><td class="num-sessao">8</td><td>3</td><td>Movimentos 1 a 6</td><td>3 repetições; amplitude pequena e sem dor.</td></tr>
+            <tr data-session="9" data-week="3"><td class="num-sessao">9</td><td>3</td><td>1 a 6 em fluxo lento</td><td>4 repetições; manter o tronco ereto e os pés fixos.</td></tr>
+            <tr data-session="10" data-week="4"><td class="num-sessao">10</td><td>4</td><td>1 a 6 com correção</td><td>Olhar joelhos e quadril; 4 a 6 repetições conforme o conforto.</td></tr>
+            <tr data-session="11" data-week="4"><td class="num-sessao">11</td><td>4</td><td>1 a 6 com respiração guiada</td><td>Dose completa; inspirar pelo nariz, expirar pela boca ou nariz.</td></tr>
+            <tr data-session="12" data-week="4"><td class="num-sessao">12</td><td>4</td><td>1 a 6 e revisão</td><td>6 repetições; registrar o progresso da semana de 1 a 5.</td></tr>
+            <tr data-session="13" data-week="5"><td class="num-sessao">13</td><td>5</td><td>Introduzir o movimento 7</td><td>5 elevações de calcanhar e ponta; revisar 1 a 6.</td></tr>
+            <tr data-session="14" data-week="5"><td class="num-sessao">14</td><td>5</td><td>Movimentos 1 a 8 com pausas</td><td>2 repetições de cada; pausa de 20 a 30 segundos entre movimentos.</td></tr>
+            <tr data-session="15" data-week="5"><td class="num-sessao">15</td><td>5</td><td>1 a 8 e revisão</td><td>10 elevações do 7; conferir tontura e cansaço.</td></tr>
+            <tr data-session="16" data-week="6"><td class="num-sessao">16</td><td>6</td><td>Sequência 1 a 8</td><td>1 a 8 com pausas curtas; começar o fluxo contínuo.</td></tr>
+            <tr data-session="17" data-week="6"><td class="num-sessao">17</td><td>6</td><td>Fluxo contínuo com pausas curtas</td><td>1 a 8 em fluxo contínuo; 3 repetições de cada movimento.</td></tr>
+            <tr data-session="18" data-week="6"><td class="num-sessao">18</td><td>6</td><td>Fluxo contínuo 1 a 8 e revisão</td><td>Dose completa quando confortável; revisar sinais de alerta.</td></tr>
+            <tr data-session="19" data-week="7"><td class="num-sessao">19</td><td>7</td><td>Fluxo contínuo 1 a 8</td><td>Reduzir pausas; manter a respiração calma e as transições suaves.</td></tr>
+            <tr data-session="20" data-week="7"><td class="num-sessao">20</td><td>7</td><td>Fluxo com contagem</td><td>6 repetições; foco na passagem de um movimento para o outro.</td></tr>
+            <tr data-session="21" data-week="7"><td class="num-sessao">21</td><td>7</td><td>Fluxo e revisão de segurança</td><td>Checar dor, tontura e sono; ajustar a dose se necessário.</td></tr>
+            <tr data-session="22" data-week="8"><td class="num-sessao">22</td><td>8</td><td>Sequência completa fluida</td><td>Sem pausas longas; o praticante conduz a sessão.</td></tr>
+            <tr data-session="23" data-week="8"><td class="num-sessao">23</td><td>8</td><td>Autonomia acompanhada</td><td>O mentor apenas observa e registra; corrige só se for seguro.</td></tr>
+            <tr data-session="24" data-week="8"><td class="num-sessao">24</td><td>8</td><td>Sessão de encerramento</td><td>Celebrar a conquista e definir o plano de manutenção.</td></tr>
+          </tbody>
+        </table>
+      </div>
+<p class="dica-rolagem">Deslize a tabela para o lado para ver todas as colunas.</p>
+      <p class="nota-pequena"><strong>Total: 24 sessões</strong> — 8 semanas × 3 sessões. Cada sessão inclui aquecimento (5 min), sequência principal (15 a 20 min) e resfriamento (5 min).</p>
+    </div>
+  </section>
+
+  <!-- ==================== MENTOR ==================== -->
+  <section class="secao" id="mentor" aria-labelledby="mentor-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Acompanhamento</span>
+        <h2 id="mentor-titulo">Guia do mentor</h2>
+        <p>O mentor pode ser um familiar, cuidador, fisioterapeuta ou profissional de educação física. Ele acompanha, encoraja e registra — sem substituir a avaliação de saúde.</p>
+      </div>
+
+      <div class="blocos">
+        <div class="bloco">
+          <h3>Papel do mentor</h3>
+          <ul>
+            <li>Demonstrar cada movimento devagar, de frente ou de lado, na altura dos olhos do praticante.</li>
+            <li>Corrigir com palavras simples e poucas instruções por vez (“pés no chão”, “ombros soltos”).</li>
+            <li>Ajustar a dose (repetições e amplitude) ao dia e ao corpo do praticante.</li>
+            <li>Registrar o progresso semanal e observar sinais de alerta.</li>
+            <li>Incentivar a autonomia: aos poucos, o praticante conduz a própria prática.</li>
+            <li>Nunca empurrar, forçar amplitude ou insistir se houver dor, tontura ou cansaço.</li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>Cadência de check-in: 2 vezes por semana</h3>
+          <ul>
+            <li><strong>Início da semana:</strong> como o praticante está (dor, sono, energia) e qual é o objetivo da semana.</li>
+            <li><strong>Fim da semana:</strong> o que foi mais fácil, o que foi difícil e o que ajustar na dose seguinte.</li>
+            <li>Contato curto, de 10 minutos, presencial ou por telefone.</li>
+            <li>Sempre perguntar sobre tontura, dor no peito, falta de ar e cansaço excessivo.</li>
+            <li>Anotar as respostas no registro semanal (tabela abaixo).</li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>Roteiro de uma sessão guiada</h3>
+          <ol>
+            <li><strong>Intenção (2 min):</strong> conversar brevemente, checar como o corpo está e definir o foco do dia.</li>
+            <li><strong>Demonstração (3 a 5 min):</strong> mostrar dois ou três movimentos devagar, explicando pés, joelhos, coluna e respiração.</li>
+            <li><strong>Prática com correção (15 a 18 min):</strong> o praticante executa; o mentor observa, ajusta e elogia o que está funcionando.</li>
+            <li><strong>Revisão (2 a 3 min):</strong> perguntar como foi, registrar a nota de 1 a 5 e combinar a próxima sessão.</li>
+          </ol>
+        </div>
+      </div>
+
+      <h3>Registro semanal de progresso (escala 1 a 5)</h3>
+      <p>Preencha ao fim de cada semana, ou imprima a página e anote à mão. A escala é sempre a mesma: <strong>1 = muito difícil ou ruim · 3 = regular · 5 = muito fácil ou ótimo</strong>.</p>
+      <div class="tabela-rolagem" tabindex="0" role="region" aria-label="Tabela de registro semanal de progresso, escala de 1 a 5">
+        <table class="registro">
+          <caption>Registro semanal de progresso — equilíbrio, conforto, respiração, energia e sono</caption>
+          <thead>
+            <tr>
+              <th scope="col">Semana</th>
+              <th scope="col">Equilíbrio</th>
+              <th scope="col">Conforto</th>
+              <th scope="col">Respiração</th>
+              <th scope="col">Energia</th>
+              <th scope="col">Sono</th>
+              <th scope="col">Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-week="1"><th scope="row">Semana 1</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 1 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 1 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 1 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 1 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 1 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="2"><th scope="row">Semana 2</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 2 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 2 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 2 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 2 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 2 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="3"><th scope="row">Semana 3</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 3 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 3 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 3 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 3 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 3 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="4"><th scope="row">Semana 4</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 4 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 4 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 4 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 4 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 4 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="5"><th scope="row">Semana 5</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 5 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 5 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 5 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 5 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 5 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="6"><th scope="row">Semana 6</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 6 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 6 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 6 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 6 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 6 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="7"><th scope="row">Semana 7</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 7 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 7 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 7 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 7 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 7 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+            <tr data-week="8"><th scope="row">Semana 8</th>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 8 — equilíbrio, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 8 — conforto, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 8 — respiração, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 8 — energia, nota de 1 a 5"></td>
+              <td><input type="number" min="1" max="5" step="1" inputmode="numeric" aria-label="Semana 8 — sono, nota de 1 a 5"></td>
+              <td> </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+<p class="dica-rolagem">Deslize a tabela para o lado para ver todas as colunas.</p>
+      <p class="legenda-escala"><strong>Dica de registro:</strong> anote uma frase curta em “Observações” (por exemplo, “ombro direito mais solto”) e compare as semanas. O registro vale mais que a memória.</p>
+
+      <div class="blocos">
+        <div class="bloco borda-progressao">
+          <h3>Critérios para progredir</h3>
+          <ul>
+            <li>Faz a sequência completa <strong>sem dor</strong> e <strong>sem perder o fôlego</strong>.</li>
+            <li>Mantém a respiração calma e não prende o ar durante os movimentos.</li>
+            <li>Sente o movimento confortável e seguro, sem tontura ou cansaço excessivo.</li>
+            <li>Registra <strong>4 ou 5</strong> em equilíbrio e conforto por duas semanas seguidas.</li>
+            <li>Consegue conversar enquanto pratica (respiração confortável).</li>
+          </ul>
+        </div>
+        <div class="bloco borda-regressao">
+          <h3>Critérios para regredir</h3>
+          <ul>
+            <li>Qualquer <strong>dor</strong> durante ou depois da prática.</li>
+            <li><strong>Tontura</strong>, visão embaralhada ou sensação de desmaio.</li>
+            <li><strong>Cansaço excessivo</strong> ou falta de ar que não passa em poucos minutos.</li>
+            <li>Piora no sono, na energia ou no equilíbrio em relação à semana anterior.</li>
+            <li>Ação: reduzir repetições e amplitude, pausar o movimento que incomoda; se persistir, procurar um profissional de saúde.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ESCRITÓRIO ==================== -->
+  <section class="secao" id="escritorio" aria-labelledby="escritorio-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Adaptação rápida</span>
+        <h2 id="escritorio-titulo">Taichi na cadeira de trabalho (versão escritório)</h2>
+        <p>Uma trilha curta para quem passa muitas horas sentado: pausas de <strong>3 a 5 minutos a cada 60 a 90 minutos</strong>, sem sair da cadeira e sem suar. Ideal entre reuniões ou tarefas longas no computador.</p>
+      </div>
+
+      <div class="blocos">
+        <div class="bloco">
+          <h3>Antes de começar no escritório</h3>
+          <ul class="checklist">
+            <li><strong>Trave as rodas</strong> da cadeira de escritório — nunca faça os movimentos com a cadeira solta.</li>
+            <li>Encoste o quadril no fundo do assento e apoie os pés no chão.</li>
+            <li>Ajuste a altura do assento para os joelhos ficarem a aproximadamente 90°.</li>
+            <li>Coluna alongada, ombros relaxados e tela do computador na altura dos olhos.</li>
+            <li>Afaste objetos frágeis do alcance dos braços e mantenha o ambiente livre.</li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>3 movimentos indicados para a pausa</h3>
+          <ul class="mov-indicados">
+            <li>
+              <a href="#mov2">Mãos em Nuvem (云手)</a>
+              <span>1 a 2 minutos para soltar ombros e pescoço, com círculos lentos das mãos.</span>
+            </li>
+            <li>
+              <a href="#mov4">Ondear as Mãos como Nuvens (云手变式)</a>
+              <span>1 a 2 minutos para mobilidade dos braços, com ondas contínuas e leves.</span>
+            </li>
+            <li>
+              <a href="#mov7">Calcanhar e Ponta do Pé (提踵)</a>
+              <span>1 minuto para ativar a circulação das pernas, sem levantar da cadeira.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="bloco">
+          <h3>Rotina de 5 minutos</h3>
+          <ol class="rotina-lista">
+            <li><span class="tempo">0–1 min</span><span>Respiração lenta: inspire 4s, expire 4s, pés no chão.</span></li>
+            <li><span class="tempo">1–2 min</span><span>Mãos em Nuvem, 3 vezes de cada lado.</span></li>
+            <li><span class="tempo">2–3 min</span><span>Ondear as Mãos, 4 ondas suaves.</span></li>
+            <li><span class="tempo">3–4 min</span><span>Calcanhar e Ponta do Pé, 10 alternâncias.</span></li>
+            <li><span class="tempo">4–5 min</span><span>Respiração final e olhar ao longe para descansar os olhos.</span></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="aviso-escritorio">
+        <p><strong>Atenções da versão escritório:</strong> a pausa não substitui o descanso nem o alongamento orientado; pare se sentir dor, tontura ou falta de ar. Não faça os movimentos em cadeira com rodas destravadas, nem em pé. Se trabalhar em casa, cuide para não haver fios, tapetes ou objetos no caminho.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== IMPRIMIR ==================== -->
+  <section class="secao" id="imprimir" aria-labelledby="imprimir-titulo">
+    <div class="container">
+      <div class="secao-cabeca">
+        <span class="secao-olho">Leve o programa com você</span>
+        <h2 id="imprimir-titulo">Versão para imprimir ou salvar em PDF</h2>
+      </div>
+      <div class="caixa-imprimir">
+        <p>Clique no botão para abrir a impressão do navegador. A versão impressa esconde a navegação e os botões, mantém os 8 cartões, as tabelas e o registro semanal, e evita quebrar um cartão no meio. No diálogo, escolha <strong>Salvar como PDF</strong> para guardar no computador ou celular.</p>
+        <button class="botao botao-primario js-imprimir" type="button" id="btn-imprimir">Imprimir / Salvar PDF</button>
+      </div>
+      <p class="nota-pequena">A impressão usa as mesmas imagens e textos da tela — nada é baixado da internet. Se a impressão sair com o diagrama de postura pequeno, escolha a orientação “retrato” e papel A4.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="rodape" aria-labelledby="rodape-titulo">
+  <div class="container">
+    <div class="rodape-grade">
+      <div>
+        <h2 id="rodape-titulo">Taichi na Cadeira</h2>
+        <p>Programa educativo de tai chi sentado para idosos e pessoas com mobilidade reduzida ou em reabilitação. Movimentos lentos, respiração tranquila e segurança em primeiro lugar.</p>
+        <p class="nota">Este material <strong>não substitui avaliação médica ou fisioterapêutica</strong> e não serve para diagnosticar, tratar ou curar condições de saúde.</p>
+      </div>
+      <div>
+        <h3 style="color:#fffdf8;font-size:1.15rem">Navegação</h3>
+        <ul>
+          <li><a href="#seguranca">Segurança</a></li>
+          <li><a href="#postura">Postura sentada</a></li>
+          <li><a href="#movimentos">Os 8 movimentos</a></li>
+          <li><a href="#programa">Programa de 8 semanas</a></li>
+          <li><a href="#mentor">Guia do mentor</a></li>
+          <li><a href="#escritorio">Versão escritório</a></li>
+          <li><a href="#imprimir">Imprimir / PDF</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:#fffdf8;font-size:1.15rem">Sobre este arquivo</h3>
+        <ul>
+          <li>100% offline: abre por duplo clique, sem servidor.</li>
+          <li>Sem CDN, sem bibliotecas e sem mídia externa.</li>
+          <li>Nenhum dado é coletado; nada é enviado pela internet.</li>
+          <li>Interface em português do Brasil, com textos grandes e contraste alto.</li>
+        </ul>
+        <p><a href="#conteudo">Voltar ao topo</a></p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Botões de impressão ---------- */
+  var botoesImprimir = document.querySelectorAll('.js-imprimir');
+  for (var i = 0; i < botoesImprimir.length; i++) {
+    botoesImprimir[i].addEventListener('click', function () {
+      window.print();
+    });
+  }
+
+  /* ---------- Modo de fluxo contínuo ---------- */
+  var movimentos = [
+    { id: 'mov1', nome: 'Abertura (Preparação)', inspira: 4, expira: 4, ciclos: 6 },
+    { id: 'mov2', nome: 'Mãos em Nuvem', inspira: 4, expira: 4, ciclos: 6 },
+    { id: 'mov3', nome: 'Separar a Crina do Cavalo Selvagem', inspira: 4, expira: 4, ciclos: 6 },
+    { id: 'mov4', nome: 'Ondear as Mãos como Nuvens', inspira: 4, expira: 4, ciclos: 6 },
+    { id: 'mov5', nome: 'Afastar e Puxar (Aparar e Recuar)', inspira: 4, expira: 4, ciclos: 4 },
+    { id: 'mov6', nome: 'Escovar o Joelho (adaptado)', inspira: 4, expira: 4, ciclos: 4 },
+    { id: 'mov7', nome: 'Calcanhar e Ponta do Pé', inspira: 4, expira: 4, ciclos: 10 },
+    { id: 'mov8', nome: 'Fechamento', inspira: 4, expira: 6, ciclos: 4 }
+  ];
+
+  var btnIniciar = document.getElementById('btn-fluxo');
+  var btnPausar = document.getElementById('btn-pausar');
+  var btnAvancar = document.getElementById('btn-avancar');
+  var btnParar = document.getElementById('btn-parar');
+  var statusEl = document.getElementById('fluxo-status');
+  var tempoEl = document.getElementById('fluxo-tempo');
+
+  if (btnIniciar && btnPausar && btnAvancar && btnParar && statusEl) {
+    var reduzirMovimento = false;
+    if (window.matchMedia) {
+      var consultaMovimento = window.matchMedia('(prefers-reduced-motion: reduce)');
+      reduzirMovimento = consultaMovimento.matches;
+      if (consultaMovimento.addEventListener) {
+        consultaMovimento.addEventListener('change', function (evento) {
+          reduzirMovimento = evento.matches;
+        });
+      }
+    }
+
+    var estado = {
+      ativo: false,
+      pausado: false,
+      indice: 0,
+      fase: 'inspira',
+      restante: 0,
+      ciclo: 1,
+      timer: null
+    };
+
+    function movimentoAtual() {
+      return movimentos[estado.indice];
+    }
+
+    function elementoDoMovimento() {
+      return document.getElementById(movimentos[estado.indice].id);
+    }
+
+    function limparDestaques() {
+      var ativos = document.querySelectorAll('.fluxo-ativo');
+      for (var j = 0; j < ativos.length; j++) {
+        ativos[j].classList.remove('fluxo-ativo');
+      }
+    }
+
+    function destacarCartao() {
+      limparDestaques();
+      var cartao = elementoDoMovimento();
+      if (!cartao) {
+        return;
+      }
+      cartao.classList.add('fluxo-ativo');
+      if (typeof cartao.scrollIntoView === 'function') {
+        try {
+          cartao.scrollIntoView({
+            behavior: reduzirMovimento ? 'auto' : 'smooth',
+            block: 'center'
+          });
+        } catch (erro) {
+          cartao.scrollIntoView();
+        }
+      }
+    }
+
+    function textoDaFase() {
+      return estado.fase === 'inspira' ? 'Inspire' : 'Expire';
+    }
+
+    function segundosDaFase() {
+      return estado.fase === 'inspira' ? movimentoAtual().inspira : movimentoAtual().expira;
+    }
+
+    function atualizarTempo() {
+      if (tempoEl) {
+        tempoEl.textContent = textoDaFase() + ' por ' + estado.restante +
+          's · respiração ' + estado.ciclo + ' de ' + movimentoAtual().ciclos;
+      }
+    }
+
+    function anunciar(texto) {
+      statusEl.textContent = texto;
+    }
+
+    function anunciarMovimento() {
+      anunciar('Movimento ' + (estado.indice + 1) + ' de 8: ' + movimentoAtual().nome +
+        '. ' + textoDaFase() + ' por ' + estado.restante + ' segundos.');
+    }
+
+    function atualizarBotoes() {
+      btnIniciar.disabled = estado.ativo && !estado.pausado;
+      btnPausar.disabled = !estado.ativo;
+      btnAvancar.disabled = !estado.ativo;
+      btnParar.disabled = !estado.ativo;
+      btnPausar.textContent = estado.pausado ? 'Retomar' : 'Pausar';
+      btnIniciar.textContent = estado.ativo ? 'Reiniciar fluxo' : 'Iniciar fluxo';
+    }
+
+    function iniciarFase(anunciarAgora) {
+      estado.restante = segundosDaFase();
+      atualizarTempo();
+      if (anunciarAgora) {
+        anunciarMovimento();
+      }
+    }
+
+    function pararTimer() {
+      if (estado.timer !== null) {
+        window.clearInterval(estado.timer);
+        estado.timer = null;
+      }
+    }
+
+    function encerrar(mensagem) {
+      pararTimer();
+      estado.ativo = false;
+      estado.pausado = false;
+      estado.restante = 0;
+      limparDestaques();
+      atualizarBotoes();
+      if (tempoEl) {
+        tempoEl.textContent = 'Parado.';
+      }
+      anunciar(mensagem || 'Fluxo encerrado. Você pode começar de novo quando quiser.');
+    }
+
+    function iniciarFluxo() {
+      pararTimer();
+      estado.ativo = true;
+      estado.pausado = false;
+      estado.indice = 0;
+      estado.ciclo = 1;
+      estado.fase = 'inspira';
+      destacarCartao();
+      atualizarBotoes();
+      iniciarFase(true);
+      estado.timer = window.setInterval(tick, 1000);
+    }
+
+    function alternarPausa() {
+      if (!estado.ativo) {
+        return;
+      }
+      estado.pausado = !estado.pausado;
+      atualizarBotoes();
+      if (estado.pausado) {
+        anunciar('Fluxo pausado em ' + movimentoAtual().nome + '. Toque em Retomar para continuar.');
+      } else {
+        anunciar('Fluxo retomado. Movimento ' + (estado.indice + 1) + ' de 8: ' + movimentoAtual().nome +
+          '. ' + textoDaFase() + ' por ' + estado.restante + ' segundos.');
+      }
+    }
+
+    function proximoMovimento() {
+      if (estado.indice >= movimentos.length - 1) {
+        encerrar('Fluxo concluído: você percorreu os 8 movimentos. Termine com uma respiração calma.');
+        return;
+      }
+      pararTimer();
+      estado.indice = estado.indice + 1;
+      estado.ciclo = 1;
+      estado.fase = 'inspira';
+      destacarCartao();
+      iniciarFase(true);
+      if (estado.ativo && estado.timer === null) {
+        estado.timer = window.setInterval(tick, 1000);
+      }
+    }
+
+    function tick() {
+      if (!estado.ativo || estado.pausado) {
+        return;
+      }
+      estado.restante = estado.restante - 1;
+      if (estado.restante > 0) {
+        atualizarTempo();
+        return;
+      }
+      if (estado.fase === 'inspira') {
+        estado.fase = 'expira';
+        iniciarFase(true);
+        return;
+      }
+      if (estado.ciclo >= movimentoAtual().ciclos) {
+        proximoMovimento();
+        return;
+      }
+      estado.ciclo = estado.ciclo + 1;
+      estado.fase = 'inspira';
+      iniciarFase(true);
+    }
+
+    btnIniciar.addEventListener('click', iniciarFluxo);
+    btnPausar.addEventListener('click', alternarPausa);
+    btnParar.addEventListener('click', function () {
+      encerrar();
+    });
+    btnAvancar.addEventListener('click', function () {
+      if (estado.ativo) {
+        proximoMovimento();
+      }
+    });
+
+    atualizarBotoes();
+  }
+})();
+</script>
+</body>
+</html>
