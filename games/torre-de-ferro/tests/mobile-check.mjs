@@ -62,6 +62,15 @@ async function tap(page, selector) {
   await sleep(180);
 }
 
+// Espera um estado (sem falhar o teste se demorar; o check logo depois decide).
+async function esperar(page, fn, timeout = 5000) {
+  try {
+    await page.waitForFunction(fn, null, { timeout });
+  } catch (err) {
+    /* o check seguinte registra o FAIL */
+  }
+}
+
 async function esperarPronto(page) {
   await page.waitForFunction(() => window.__TD__ && window.__TD__.ready === true, null, { timeout: 25000 });
 }
@@ -70,7 +79,7 @@ async function semRolagemHorizontal(page) {
   return page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 }
 
-async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBatalha) {
+async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBatalha, minAlvo = 40) {
   const ctx = await browser.newContext({ locale: 'pt-BR', ...opcoesContexto });
   const page = await ctx.newPage();
   const erros = [];
@@ -82,6 +91,7 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
   await esperarPronto(page);
 
   check(`[${rotulo}] carrega menu (toque)`, await page.locator('#screen-menu').isVisible());
+  if (rotulo === 'iphone') await page.screenshot({ path: path.join(SHOTS, 'mobile-iphone-menu.png') });
   check(`[${rotulo}] sem rolagem horizontal`, await semRolagemHorizontal(page), `scroll=${await page.evaluate(() => document.documentElement.scrollWidth)} largura=${await page.evaluate(() => innerWidth)}`);
 
   // Menu → campanha → tutorial por toque
@@ -91,9 +101,21 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
   await page.waitForSelector('#screen-game:not([hidden])', { timeout: 8000 });
   check(`[${rotulo}] tutorial e HUD abrem por toque`, await page.locator('#hud-top').isVisible());
 
+  // Todos os botões da barra superior precisam caber na tela (pega HUD estourando em paisagem)
+  const hudDentro = await page.evaluate(() => {
+    const botoes = [...document.querySelectorAll('.hud-botoes .botao')];
+    const fora = botoes.filter((b) => {
+      const r = b.getBoundingClientRect();
+      return r.width < 1 || r.right > window.innerWidth + 1 || r.left < -1;
+    }).map((b) => b.id || b.textContent);
+    return { total: botoes.length, fora };
+  });
+  check(`[${rotulo}] todos os botões da HUD dentro da tela`, hudDentro.fora.length === 0,
+    `${hudDentro.total - hudDentro.fora.length}/${hudDentro.total} dentro${hudDentro.fora.length ? `; fora: ${hudDentro.fora.join(',')}` : ''}`);
+
   // Alvos de toque e dica específica de toque
   const alvos = await page.evaluate(() => [...document.querySelectorAll('.hud-botoes .botao')].map((b) => b.getBoundingClientRect().height));
-  check(`[${rotulo}] alvos de toque ≥ 40 px`, alvos.length > 0 && alvos.every((h) => h >= 40), `alturas=${alvos.map((h) => Math.round(h)).join(',')}`);
+  check(`[${rotulo}] alvos de toque ≥ ${minAlvo} px`, alvos.length > 0 && alvos.every((h) => h >= minAlvo), `alturas=${alvos.map((h) => Math.round(h)).join(',')}`);
   const ajudaMovel = await page.evaluate(() => {
     const a = document.querySelector('.ajuda-movel');
     return a ? getComputedStyle(a).display : 'ausente';
@@ -102,12 +124,18 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
 
   // Painel de tropas e velocidade/mudo por toque
   await tap(page, '#btn-tropas');
+  await esperar(page, () => {
+    const p = document.querySelector('#painel-tropas');
+    return p && !p.hidden;
+  });
   check(`[${rotulo}] painel de tropas abre por toque`, await page.locator('#painel-tropas').isVisible());
   await tap(page, '#btn-fechar-tropas');
   await tap(page, '#btn-velocidade');
+  await esperar(page, () => document.querySelector('#btn-velocidade')?.textContent.trim() === '2x');
   check(`[${rotulo}] velocidade 1x→2x por toque`, (await page.locator('#btn-velocidade').textContent()).trim() === '2x');
   await tap(page, '#btn-velocidade');
   await tap(page, '#btn-mudo');
+  await esperar(page, () => document.querySelector('#btn-mudo')?.textContent.trim() === 'Mudo');
   check(`[${rotulo}] botão de som alterna para Mudo`, (await page.locator('#btn-mudo').textContent()).trim() === 'Mudo');
   await tap(page, '#btn-mudo');
 
@@ -121,22 +149,27 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
   const voltou = await page.evaluate(() => window.__TD__.view().distance);
   check(`[${rotulo}] botão − afasta`, voltou > depois, `${depois.toFixed(1)} → ${voltou.toFixed(1)}`);
 
-  // Pinça com dois dedos via CDP
+  // Pinça com dois dedos via CDP (coordenadas relativas ao viewport atual)
   const cdp = await ctx.newCDPSession(page);
   const v0 = await page.evaluate(() => window.__TD__.view().distance);
+  const vp = page.viewportSize();
+  const cy = Math.round(vp.height * 0.6);
+  const cx = Math.round(vp.width / 2);
+  const gap0 = Math.round(Math.min(80, vp.width * 0.15));
+  const gap1 = Math.round(Math.min(130, vp.width * 0.28));
   const tocar = async (type, pontos) => {
     await cdp.send('Input.dispatchTouchEvent', {
       type,
       touchPoints: pontos.map(([x, y], i) => ({ x, y, id: i, radiusX: 2, radiusY: 2, force: 1 })),
     });
   };
-  await tocar('touchStart', [[130, 430], [260, 430]]);
-  await tocar('touchMove', [[110, 430], [280, 430]]);
-  await tocar('touchMove', [[90, 430], [300, 430]]);
+  await tocar('touchStart', [[cx - gap0, cy], [cx + gap0, cy]]);
+  await tocar('touchMove', [[cx - gap1, cy], [cx + gap1, cy]]);
+  await tocar('touchMove', [[cx - Math.round(gap1 * 1.1), cy], [cx + Math.round(gap1 * 1.1), cy]]);
   await tocar('touchEnd', []);
   await sleep(150);
   const v1 = await page.evaluate(() => window.__TD__.view().distance);
-  check(`[${rotulo}] pinça de dois dedos dá zoom`, v1 < v0, `${v0.toFixed(1)} → ${v1.toFixed(1)}`);
+  check(`[${rotulo}] pinça de dois dedos dá zoom`, v1 < v0, `${v0.toFixed(1)} → ${v1.toFixed(1)} (y=${cy} de ${vp.height})`);
 
   // Construir torre tocando no canvas (slot projetado pelo próprio jogo)
   const slot = await page.evaluate(() => {
@@ -150,11 +183,15 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
   check(`[${rotulo}] slot projetado na tela`, !!slot, slot ? `slot ${slot.slot} em (${Math.round(slot.x)},${Math.round(slot.y)})` : 'nenhum');
   if (slot) {
     await page.touchscreen.tap(slot.x, slot.y);
-    await sleep(250);
+    await esperar(page, () => {
+      const p = document.querySelector('#painel-construir');
+      return p && !p.hidden;
+    });
     const painel = await page.locator('#painel-construir').isVisible();
     check(`[${rotulo}] toque no slot abre painel Construir`, painel);
     if (painel) {
       await tap(page, '#painel-construir [data-torre="metralhadora"]');
+      await esperar(page, () => window.__TD__.state().towers.length >= 1);
       const torres = await page.evaluate(() => window.__TD__.state().towers.length);
       check(`[${rotulo}] torre construída por toque`, torres >= 1, `torres=${torres}`);
     }
@@ -162,9 +199,10 @@ async function testarDispositivo(browser, url, rotulo, opcoesContexto, fazerBata
 
   // Iniciar onda por toque e ver inimigos
   await tap(page, '#btn-onda');
-  await sleep(300);
-  const emOnda = await page.evaluate(() => window.__TD__.state().phase === 'wave');
+  await esperar(page, () => window.__TD__.state().phase === 'wave');
   await page.evaluate(() => window.__TD__.fastForward(4));
+  await esperar(page, () => window.__TD__.state().enemies.length > 0);
+  const emOnda = await page.evaluate(() => window.__TD__.state().phase === 'wave');
   const inimigos = await page.evaluate(() => window.__TD__.state().enemies.length);
   check(`[${rotulo}] onda inicia e inimigos surgem`, emOnda && inimigos > 0, `faseOnda=${emOnda} inimigos=${inimigos}`);
 
@@ -250,11 +288,20 @@ async function main() {
       hasTouch: true,
       userAgent: 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
     };
+    // Celular na horizontal (o caso que a HUD já estourou): iPhone SE 667×375.
+    const iPhonePaisagem = {
+      viewport: { width: 667, height: 375 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    };
     const rodada1 = await testarDispositivo(browser, serverUrl, 'iphone', iPhone, true);
-    await rodada1.page.screenshot({ path: path.join(SHOTS, 'mobile-iphone-menu.png') });
+    await rodada1.ctx.close();
     const rodada2 = await testarDispositivo(browser, serverUrl, 'ipad', iPad, false);
     await rodada2.ctx.close();
-    await rodada1.ctx.close();
+    const rodada3 = await testarDispositivo(browser, serverUrl, 'iphone-paisagem', iPhonePaisagem, false);
+    await rodada3.ctx.close();
   } finally {
     await browser.close();
     try { child.kill(); } catch (err) { /* opcional */ }

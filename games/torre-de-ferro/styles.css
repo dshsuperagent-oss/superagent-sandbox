@@ -482,12 +482,14 @@ html, body {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  .hud-topo { flex-wrap: nowrap; overflow-x: auto; }
-  .hud-botoes { width: auto; margin-left: auto; flex-wrap: nowrap; }
+  .hud-topo { flex-wrap: wrap; overflow: visible; gap: 0.3rem; }
+  .hud-recurso { padding: 0.22rem 0.45rem; font-size: 0.78rem; }
+  .hud-botoes { width: 100%; margin-left: 0; justify-content: flex-end; flex-wrap: wrap; gap: 0.25rem; }
+  .botao--hud { min-height: 40px; padding: 0.3rem 0.5rem; font-size: 0.76rem; }
   .painel-flutuante { top: 0.4rem; bottom: auto; max-height: 82vh; width: min(320px, 46vw); }
   .tutorial { bottom: 0.3rem; width: min(520px, 62vw); }
   .dica-toque { display: none; }
-  .chefe-barra { top: 0.4rem; }
+  .chefe-barra { top: 6.3rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
