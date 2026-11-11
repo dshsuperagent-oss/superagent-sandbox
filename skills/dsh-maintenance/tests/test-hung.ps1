@@ -13,7 +13,7 @@
 param(
     [string]$RepoRoot = '',
     [int]$Port = 38080,
-    [int]$TimeoutSec = 45
+    [int]$TimeoutSec = 60
 )
 
 $ErrorActionPreference = 'Continue'
@@ -41,10 +41,10 @@ try {
     Write-TestStamp ('   node pid=' + $nodeProc.Id)
 
     Write-TestStamp '2. observador apontado para a porta de teste'
-    $obsArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $observer, '-DataDir', $dataDir, '-Port', $Port, '-TargetPid', $nodeProc.Id, '-DurationSeconds', 50)
+    $obsArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $observer, '-DataDir', $dataDir, '-Port', $Port, '-TargetPid', $nodeProc.Id, '-DurationSeconds', 90)
     $obs = Start-Process -FilePath 'powershell.exe' -ArgumentList $obsArgs -WindowStyle Hidden -PassThru
     $obsPid = [int]$obs.Id
-    if (-not (Wait-Heartbeat (Join-Path $dataDir 'observacao\estado.json') 15)) { throw 'sem heartbeat' }
+    if (-not (Wait-Heartbeat (Join-Path $dataDir 'observacao\estado.json') $TimeoutSec)) { throw 'sem heartbeat' }
 
     Write-TestStamp '3. aguardando veredito hung (>20 s sem resposta)'
     $verdict = Wait-Until { Get-NewestVerdict (Join-Path $dataDir 'observacao') } $TimeoutSec 500

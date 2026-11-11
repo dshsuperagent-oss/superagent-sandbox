@@ -19,7 +19,7 @@ param(
     [string]$RepoRoot = '',
     [ValidateSet('stop-process', 'taskkill')]
     [string]$Killer = 'stop-process',
-    [int]$TimeoutSec = 20
+    [int]$TimeoutSec = 60
 )
 
 $ErrorActionPreference = 'Continue'
@@ -47,7 +47,7 @@ try {
     $victimPid = [int]$victim.Id
     Write-TestStamp ('   victim pid=' + $victimPid)
 
-    $argLine = '-NoProfile -ExecutionPolicy Bypass -File "' + $observer + '" -DataDir "' + $dataDir + '" -TargetPid ' + $victimPid + ' -DurationSeconds 90'
+    $argLine = '-NoProfile -ExecutionPolicy Bypass -File "' + $observer + '" -DataDir "' + $dataDir + '" -TargetPid ' + $victimPid + ' -DurationSeconds 150'
     $obs = Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine -WindowStyle Hidden -PassThru
     $obsPid = [int]$obs.Id
     Write-TestStamp ('2. observador pid=' + $obsPid + ' (fora da arvore do DSH, so leitura)')
@@ -58,7 +58,31 @@ try {
 
     Start-Sleep -Milliseconds 800
 
+    # Prova de durabilidade: com o observador VIVO, ler os JSONL e mostrar a linha
+    # ja gravada. (Get-ChildItem pode mostrar tamanho defasado com o arquivo
+    # aberto; o conteudo e lido por stream/Get-Content.) Este check impede a
+    # regressao do flush.
+    $procDay = (Get-Date).ToString('yyyy-MM-dd')
+    $procFile = Join-Path $dataDir ('observacao\processos-' + $procDay + '.jsonl')
+    $snapFile = Join-Path $dataDir ('observacao\snapshot-' + $procDay + '.jsonl')
+    $durBytes = 0
+    try {
+        $fsDur = [System.IO.File]::Open($procFile, 'Open', 'Read', 'ReadWrite')
+        $durBytes = $fsDur.Length
+        $fsDur.Dispose()
+    } catch { }
+    $durLive = @(Get-Content -LiteralPath $procFile -ErrorAction SilentlyContinue)
+    $durUltima = '(vazio)'
+    if ($durLive.Count -gt 0) { $durUltima = [string]$durLive[$durLive.Count - 1] }
+    Write-TestStamp ('   durabilidade (observador vivo): processos bytes=' + $durBytes + ' linhas=' + $durLive.Count)
+    Write-TestStamp ('   ultima linha ja visivel: ' + (Truncate-TestText $durUltima 320))
+    if ($durLive.Count -lt 1 -or $durBytes -le 0) { $falhas += 'processos-*.jsonl vazio com o observador vivo (flush nao efetivo)' }
+    if (-not (Test-Path -LiteralPath $snapFile)) { $falhas += 'snapshot-*.jsonl ausente com o observador vivo' }
+
+    $killAt = $null
+
     if ($Killer -eq 'taskkill') {
+        $killAt = Get-Date
         Write-TestStamp ('3. assassino: taskkill.exe /PID ' + $victimPid + ' /F')
         & taskkill.exe /PID $victimPid /F 2>&1 | ForEach-Object { Write-TestStamp ('   taskkill: ' + $_) }
         Start-Sleep -Milliseconds 700
@@ -81,6 +105,7 @@ try {
             exit 0
         }
     } else {
+        $killAt = Get-Date
         Write-TestStamp ('3. assassino: powershell.exe -Command "Stop-Process -Id ' + $victimPid + ' -Force" (processo externo separado)')
         $killCmd = 'Stop-Process -Id ' + $victimPid + ' -Force'
         $killerProc = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', $killCmd) -PassThru -WindowStyle Hidden -Wait
@@ -91,6 +116,7 @@ try {
     if (-not $killOk) {
         # Fallback para provar a classificacao mesmo com taskkill bloqueado.
         Write-TestStamp '   fallback: encerrando o descartavel via Stop-Process (para provar o veredito)'
+        $killAt = Get-Date
         Stop-Process -Id $victimPid -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 500
         $killOk = $victim.HasExited
@@ -104,6 +130,15 @@ try {
     $procFile = Join-Path $dataDir ('observacao\processos-' + (Get-Date).ToString('yyyy-MM-dd') + '.jsonl')
     $linhas = @(Get-Content -LiteralPath $procFile -ErrorAction SilentlyContinue)
     $evid = @($verdict.evidencias | Where-Object { $_.fonte -like 'processos-*' })
+
+    # Latencia inicio do kill -> registro do veredito (aceite da issue: <= 5 s).
+    $deathToVerdict = $null
+    if ($null -ne $killAt -and $verdict.gerado_em) {
+        try { $deathToVerdict = [math]::Round(([datetime]::Parse([string]$verdict.gerado_em) - $killAt).TotalSeconds, 2) } catch { }
+    }
+    Write-TestStamp ('   morte->veredito_s=' + $deathToVerdict)
+    if ($null -eq $deathToVerdict) { $falhas += 'nao foi possivel medir morte->veredito' }
+    elseif ($deathToVerdict -gt 5.0) { $falhas += ('registro de morte ' + $deathToVerdict + 's apos a morte (limite 5 s)') }
 
     Write-Host ''
     Write-Host '== TRECHO processos-*.jsonl (assassino) =='

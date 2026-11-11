@@ -79,6 +79,11 @@ Ordem de leitura — sempre nesta sequência, do mais barato ao mais caro:
    Select-String -Path $p -Pattern 'taskkill|Stop-Process|3080' | Select-Object LineNumber, Line
    ```
 
+   A primeira linha do dia pode ser `{"event":"baseline","count":N,...}`: é só a
+   contagem do boot (PIDs/PPIDs pela API nativa, sem dump de todos os processos).
+   Processos que já existiam antes do observador não têm registro de `start`; a
+   morte do alvo aparece no `snapshot`/`estado.json` e no veredito.
+
 4. **Snapshots** em volta do instante (2 s cada): PID vivo/morto, HTTP, conexões.
 
 5. **Eventos** (30 s): Kernel-Power, WER/AppCrash, erros de serviço, TaskScheduler.

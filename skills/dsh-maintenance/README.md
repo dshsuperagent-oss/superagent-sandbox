@@ -30,7 +30,7 @@ Uso operacional no dia a dia (o que fazer quando o DSH cai): [SKILL.md](SKILL.md
 | Fluxo | Intervalo | Arquivo | Pergunta que responde |
 |---|---|---|---|
 | Snapshot do alvo | 2 s | `snapshot-AAAA-MM-DD.jsonl` | o DSH estava vivo? respondendo? quantas conexões? |
-| Diff de processos | 100 ms | `processos-AAAA-MM-DD.jsonl` | **quem** apareceu/saiu, com PID, PPID, commandline e ancestrais |
+| Diff de processos | 100 ms (1º ciclo: baseline) | `processos-AAAA-MM-DD.jsonl` | **quem** apareceu/saiu, com PID, PPID, commandline e ancestrais |
 | Event Log | 30 s | `eventos-AAAA-MM-DD.jsonl` | Kernel-Power, WER/AppCrash, erros de serviço, TaskScheduler |
 | Sessões | 30 s | `hash-sessoes-AAAA-MM-DD.jsonl` | a conversa parou de gravar em que instante? |
 | Heartbeat | 5 s | `estado.json` | o próprio observador está vivo? |
@@ -107,13 +107,21 @@ timeout de 4 s do probe) por mais de 20 s consecutivos.
 
 ### `processos-AAAA-MM-DD.jsonl` — poll de 100 ms, só o diff
 
+No boot, antes do primeiro diff, o observador grava **uma** linha
+`{"event":"baseline","count":N,...}` com a contagem de processos vinda da API
+nativa (`NtQuerySystemInformation`, sem PEB). Processos que já existiam não são
+"novos": não há dump de PIDs/commandline de todos no startup. Só quem nasce
+depois do baseline entra com PID/PPID/commandline/ancestrais. É isso que mantém o
+primeiro ciclo barato (ver "Custo medido") e impede o arquivo de crescer com
+centenas de linhas no start.
+
 ```json
 {"ts":"2026-11-11T16:49:23-03:00","event":"start","pid":8844,"ppid":6120,"name":"taskkill","cmdline":"taskkill /PID 5660 /T /F","start":"2026-11-11T16:49:23-03:00","ancestors":[{"pid":6120,"ppid":4896,"name":"powershell","cmdline":"powershell -File restart-dsh.ps1"},{"pid":4896,"ppid":400,"name":"cmd","cmdline":"cmd /c ..."}],"suspect":true,"reasons":["nome:taskkill","cmdline_suspeita","menciona_pid_alvo"],"target_pid":5660,"fonte":"peb","error":null}
 ```
 
 | Campo | Significado |
 |---|---|
-| `event` | `start` (novo), `exit` (saiu) ou `target_adopted` (alvo descoberto pela porta) |
+| `event` | `baseline` (1º ciclo, só contagem), `start` (novo), `exit` (saiu), `target_adopted` (alvo descoberto pela porta) ou `target_fixed` (alvo veio por `-TargetPid`) |
 | `pid`, `ppid`, `name`, `start` | identidade do processo |
 | `cmdline` | linha de comando completa (PEB) |
 | `ancestors[]` | cadeia de pais (quem mandou), com `pid`, `ppid`, `name`, `cmdline` e `error` quando a leitura falhou |
@@ -172,6 +180,11 @@ diário baixo.
 `supervisor-observador.ps1` só considera falha e reergue quando passa de
 **45 s** (`-HeartbeatMaxSec`, default). Entre 15 s e 45 s ainda não há lacuna
 gravada: investigue o processo e o log do supervisor antes de concluir.
+
+O **primeiro** `estado.json` é gravado no startup, **antes** de qualquer varredura
+cara (diff de processos/PEB, snapshot, eventos, sessões). O heartbeat fica fresco
+em < 2 s e, se o DSH morrer durante o boot, já existe registro de que o
+observador estava vivo e qual alvo seguia.
 
 ### `veredito-AAAAMMDD-HHmmss.json` — gerado a cada morte detectada
 
@@ -323,6 +336,36 @@ faz `GC.Collect()` + `EmptyWorkingSet` no próprio processo **1×/min** (`-TrimS
 nem em outro processo. Números brutos da medição em
 [`TESTES.md`](../../docs/dsh-maintenance/TESTES.md#5-custo-10-min--pass).
 
+### Inicialização e primeiro dump (issue #32, medição A/B)
+
+Medido com 150 `ping.exe` extras vivos (338–340 processos visíveis), mesmo
+ambiente para o código antigo (HEAD `ab57d6e`) e o novo:
+
+| Métrica | Código antigo | Código novo |
+|---|---|---|
+| primeiro `estado.json` (heartbeat) | **15,9 s** | **0,59 s** |
+| primeiro `snapshot-*.jsonl` | 15,91 s | 0,94 s |
+| 1º ciclo de `processos-*.jsonl` | **342 linhas / 488.425 bytes** | **2 linhas / 408 bytes** |
+
+Sem os 150 processos extras (39 visíveis) o heartbeat fica em **0,56–0,59 s**.
+O primeiro ciclo antigo chegou a **21,6 s / 305.184 bytes** na verificação do Lead
+(issue #32, 314 processos). Com o baseline nativo o custo do primeiro ciclo não
+depende do número de processos: o total inicial dos 5 arquivos ficou em
+**2.283 bytes**.
+
+Steady-state após as correções (180 s monitorando a 3080 real, 24 processadores
+lógicos):
+
+| Métrica | Medido (180 s) | Limite da issue |
+|---|---|---|
+| CPU | **5,05 % de 1 núcleo** = 0,21 % da máquina | < 1 % |
+| RAM working set | média **40,5 MB**, máxima **60,3 MB** | < 80 MB |
+| RAM commit privado | média **72,4 MB**, máxima **75,6 MB** | < 80 MB |
+| Volume | **17,5 MB/dia** projetado (pouca troca de processos nesta sessão) | < 200 MB/dia |
+
+A medição de 10 min (ambiente com ~300 processos) continua valendo como pior
+caso (~45 MB/dia); o baseline reduziu o pico do startup, não o steady-state.
+
 ## Testes (o que já foi provado e como)
 
 Cada item abaixo é provado com trecho de arquivo, não com "funciona". Os testes
@@ -348,6 +391,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tes
 - **Instalador idempotente**: `install.ps1` rodado 2× sem duplicar Startup nem
   processos; `uninstall.ps1` remove Startup e mantém os dados.
 - **Hung**: porta aberta sem resposta HTTP por > 20 s gera `hung` com confiança alta.
+- **Durabilidade do JSONL**: `test-captura-killer` lê `processos-*.jsonl` com o
+  observador ainda **vivo** e mostra a última linha; falha se o arquivo estiver
+  vazio (regressão do buffer de 4 KB do `FileStream`, que já aconteceu de fato).
+- **Heartbeat e latência de morte**: o mesmo teste imprime `morte->veredito_s` e
+  exige ≤ 5 s entre o kill e o registro; o heartbeat é esperado com
+  `-TimeoutSec 60` (default derivado da medição de inicialização).
 - **Parse**: todos os `.ps1` no analisador do PowerShell + frontmatter do
   `SKILL.md` válido + `.ps1` em ASCII puro (PS 5.1 sem BOM lê como ANSI).
 
@@ -364,6 +413,10 @@ Trechos reais de cada teste em [`TESTES.md`](../../docs/dsh-maintenance/TESTES.m
   carregar os módulos CIM custa dezenas de MB e no sandbox do agente o WMI é
   negado. Em processo de outro usuário/elevado a leitura do PEB falha — nesse
   caso o campo pode vir vazio e o veredito cai para `unknown` com confiança menor.
+- **Baseline do primeiro ciclo:** processos que já existiam quando o observador
+  iniciou entram só na contagem (`{"event":"baseline"}`, sem `start`/`cmdline`).
+  Um assassino que já estivesse vivo antes do observador não terá registro de
+  `start`; a morte do alvo continua no `snapshot`/veredito.
 - **Polling de 100 ms não é gancho do kernel.** Processo que nasce e morre em
   menos de 100 ms pode não aparecer em `processos.jsonl`; a janela entre duas
   amostras é um ponto cego. Nesta máquina um `taskkill /F` bem-sucedido fica

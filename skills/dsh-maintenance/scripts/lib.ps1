@@ -423,7 +423,11 @@ function Open-JsonlWriter([string]$Path) {
     if (-not (Test-Path -LiteralPath $dir)) {
         $null = New-Item -ItemType Directory -Force -Path $dir
     }
-    $fs = [System.IO.FileStream]::new($Path, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    # FileStream SEM buffer: cada WriteLine com AutoFlush chega ao arquivo
+    # imediatamente, sem depender do buffer interno do FileStream. Obs.: ler o
+    # diretorio (Get-ChildItem) com o arquivo aberto pode mostrar tamanho 0/velho
+    # (metadata do diretorio defasado); o conteudo ja esta legivel por Get-Content.
+    $fs = [System.IO.FileStream]::new($Path, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read, 1, [System.IO.FileOptions]::None)
     $sw = [System.IO.StreamWriter]::new($fs, (New-Object System.Text.UTF8Encoding($false)))
     $sw.AutoFlush = $true
     $lines = 0
@@ -454,6 +458,9 @@ function Add-JsonlRecord([string]$ObsDir, [string]$Category, $Record, [datetime]
     try {
         $json = $Record | ConvertTo-Json -Compress -Depth 12
         $entry.Writer.WriteLine($json)
+        # Dupla garantia de durabilidade imediata: flush do texto + flush do stream.
+        $entry.Writer.Flush()
+        $entry.Writer.BaseStream.Flush()
         $entry.Lines = [int]$entry.Lines + 1
         return [int]$entry.Lines
     } catch {

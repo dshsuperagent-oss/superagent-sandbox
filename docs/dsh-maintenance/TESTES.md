@@ -17,6 +17,95 @@ Ambiente: Windows 11 build 22621, PowerShell 5.1.22621.4249, sem admin,
 > (bloqueado). O teste com `taskkill` real deve ser rodado pelo Lead em um shell
 > normal — o script é o mesmo.
 
+## 0. Correções da issue #32 (revisão da PR #31) — PASS
+
+A verificação independente da PR #31 reprovou `test-captura-killer` e
+`test-hung`: o observador levava ~22 s no primeiro ciclo (PEB/commandline por
+processo) e os testes esperavam 15–20 s pelo heartbeat. Correções na **mesma
+branch** `agent/dsh-maintenance`:
+
+1. heartbeat inicial gravado **antes** do primeiro `Invoke-ProcPoll` e antes de
+   eventos/sessões;
+2. primeiro poll virou baseline barato: PIDs/PPIDs por
+   `NtQuerySystemInformation`, sem PEB/commandline por processo, com **uma**
+   linha `{"event":"baseline","count":N,...}` no `processos-*.jsonl`;
+3. `FileStream` do JSONL sem buffer (`bufferSize=1`) + flush explícito, para não
+   depender do buffer interno do runtime;
+4. `-TimeoutSec` default dos testes frágeis derivado da medição: **60 s** em
+   `test-captura-killer` e `test-hung` (antes 20 s / 45 s e um `Wait-Heartbeat`
+   fixo de 15 s).
+
+### 0a. Inicialização com 150 processos extras (A/B, mesma máquina)
+
+Método (`.tmp\ab-init.ps1`, não versionado): sobe 150 `ping.exe` parados, inicia o
+observador com `-DataDir` limpo e mede do `Start-Process` até o `estado.json` e
+até o primeiro snapshot. Código antigo = HEAD `ab57d6e`; código novo = branch.
+
+| Métrica (338–340 processos visíveis) | Antigo | Novo |
+|---|---|---|
+| primeiro `estado.json` (heartbeat) | **15,9 s** | **0,59 s** |
+| primeiro `snapshot-*.jsonl` | 15,91 s | 0,94 s |
+| 1º ciclo `processos-*.jsonl` | **342 linhas / 488.425 bytes** | **2 linhas / 408 bytes** |
+
+Na verificação do Lead (issue #32, 314 processos) o antigo deu **21,6 s** e
+**305.184 bytes** no 1º ciclo — mesma ordem de grandeza; a diferença é a carga da
+máquina. Sem os 150 processos extras (39 visíveis) o heartbeat do código novo
+fica em **0,56–0,59 s**, e o custo do 1º ciclo não depende do número de
+processos.
+
+### 0b. Durabilidade do JSONL com o observador vivo
+
+`test-captura-killer` agora lê `processos-*.jsonl` com o observador **vivo**,
+imprime tamanho/número de linhas e mostra a última linha; falha se não houver
+linha:
+
+```
+[20:25:52] durabilidade (observador vivo): processos bytes=483 linhas=2
+[20:25:52] ultima linha ja visivel: {"ts":"2026-11-11T20:25:24.864-03:00","event":"baseline","count":41,...}
+```
+
+Conferência extra (leitura por stream, de outro processo, com o observador vivo):
+`eventos` 249 B, `hash-sessoes` 23.633 B, `snapshot` 659 B e `processos` 38.671 B
+legíveis. O "arquivo com 0 byte" observado com `Get-ChildItem` é **metadata de
+diretório defasado** enquanto o arquivo está aberto para append — o conteúdo já
+estava gravado e é legível por `Get-Content`. O writer ganhou `FileStream` sem
+buffer + flush explícito e o teste passou a cobrir essa leitura.
+
+### 0c. Latência morte → veredito
+
+`test-captura-killer` mede do início do kill até o `gerado_em` do veredito e
+exige ≤ 5 s (aceite da issue). Medições na bateria final: **0,69 s / 0,72 s /
+0,69 s** (runs 1–3); na execução avulsa de validação: 0,71 s.
+
+### 0d. Bateria 3x dos 6 testes (2026-11-11, após as correções)
+
+Todos os 18 comandos terminaram com **exit 0** e `RESULTADO: PASS`:
+
+| Teste | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| test-parse | exit 0 / PASS (0,5 s) | exit 0 / PASS (0,4 s) | exit 0 / PASS (0,4 s) |
+| test-rotacao | exit 0 / PASS (9,2 s) | exit 0 / PASS (9,2 s) | exit 0 / PASS (9,2 s) |
+| test-supervisor | exit 0 / PASS (4,2 s) | exit 0 / PASS (4,1 s) | exit 0 / PASS (4,1 s) |
+| test-captura-killer | exit 0 / PASS (3,0 s) | exit 0 / PASS (3,0 s) | exit 0 / PASS (3,0 s) |
+| test-install | exit 0 / PASS (15,7 s) | exit 0 / PASS (15,6 s) | exit 0 / PASS (15,5 s) |
+| test-hung | exit 0 / PASS (30,6 s) | exit 0 / PASS (30,5 s) | exit 0 / PASS (30,5 s) |
+
+Comandos exatamente como documentados, a partir da raiz do clone
+(`F:\ai\_lab\superagent-nativo\watcher\work\32`).
+
+### 0e. Custo após as correções (180 s, 3080 real)
+
+| Métrica | Medido | Limite da issue |
+|---|---|---|
+| CPU | **5,05 % de 1 núcleo** = 0,21 % da máquina | < 1 % |
+| RAM working set | média **40,5 MB**, máxima **60,3 MB** | < 80 MB |
+| RAM commit privado | média **72,4 MB**, máxima **75,6 MB** | < 80 MB |
+| Volume steady-state | **17,5 MB/dia** projetado (pouca troca de processos) | < 200 MB/dia |
+| Custo inicial (5 arquivos, 1º ciclo) | **2.283 bytes** | — |
+
+A medição de 10 min da seção 5 (ambiente com ~300 processos) continua valendo
+como pior caso (~45 MB/dia).
+
 ## 1. Captura de assassino (sintética) — PASS
 
 Comando:

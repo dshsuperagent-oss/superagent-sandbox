@@ -58,6 +58,8 @@ $script:Amostras = @{ snapshot = 0; processos = 0; eventos = 0; sessoes = 0; ver
 $script:LastProcPoll = (Get-Date).AddDays(-1)
 $script:ProcMap = @{}
 $script:ProcCache = @{}
+$script:Bootstrapped = $false
+$script:LastTrim = $null
 $script:RecentProc = New-Object System.Collections.ArrayList
 $script:RecentSnap = New-Object System.Collections.ArrayList
 $script:LastChildAt = (Get-Date).AddDays(-1)
@@ -172,6 +174,30 @@ function Invoke-ProcPoll {
     $prev = $script:ProcMap
     $day = Get-DataDay
     $fileName = 'processos-' + $day.ToString('yyyy-MM-dd') + '.jsonl'
+
+    # Primeiro ciclo: baseline barata. No inicio NAO existe "processo novo": tratar
+    # todos os processos como novos custava ~15-22 s (Get-Process + PEB + cadeia de
+    # ancestrais por processo) e atrasava o primeiro heartbeat. Aqui so guardamos os
+    # PIDs/PPIDs da API nativa (NtQuerySystemInformation) e gravamos UM resumo,
+    # sem cmdline de todos.
+    if (-not $script:Bootstrapped) {
+        $script:ProcMap = $nowMap
+        $script:Bootstrapped = $true
+        $script:LastProcPoll = Get-Date
+        if ($target.pid -gt 0) { $target.alive = $nowMap.ContainsKey([int]$target.pid) }
+        $rec = [pscustomobject]@{
+            ts         = Get-IsoNow
+            event      = 'baseline'
+            count      = $nowMap.Count
+            target_pid = $target.pid
+            alvo_vivo  = $target.alive
+            fonte      = 'nqsi'
+            detalhe    = 'primeiro ciclo: PIDs/PPIDs pela API nativa; sem PEB/cmdline por processo'
+        }
+        $null = Add-JsonlRecord $ObsDir 'processos' $rec $day
+        Write-PlainLog $LogDir 'observador' ('baseline: ' + $nowMap.Count + ' processos (sem PEB); alvo_vivo=' + $target.alive)
+        return
+    }
 
     # Processos novos
     foreach ($k in @($nowMap.Keys)) {
@@ -310,6 +336,7 @@ function Invoke-Snapshot {
         }
         $line = Add-JsonlRecord $ObsDir 'processos' $rec $day
         Add-RecentProc $rec $line ('processos-' + $day.ToString('yyyy-MM-dd') + '.jsonl')
+        $script:ProcCache[[int]$target.pid] = $rec
         Write-PlainLog $LogDir 'observador' ('alvo adotado: pid ' + $target.pid + ' na porta ' + $Port)
     }
 
@@ -645,14 +672,22 @@ Write-PlainLog $LogDir 'observador' ('iniciado pid=' + $PID + ' data_dir=' + $Da
 
 if ($TargetPid -gt 0) {
     $target.pid = $TargetPid
-    $target.alive = $script:ProcMap.ContainsKey($TargetPid)
     $target.start = Get-ProcessStartSafe $TargetPid
+    $target.alive = ($null -ne $target.start)
     try {
         $tp = Get-Process -Id $TargetPid -ErrorAction Stop
-        try { $target.name = [string]$tp.ProcessName } finally { $tp.Dispose() }
+        try {
+            $target.name = [string]$tp.ProcessName
+            if ($null -eq $target.start) { $target.start = $tp.StartTime.ToString('o') }
+        } finally { $tp.Dispose() }
     } catch { }
     Write-PlainLog $LogDir 'observador' ('alvo fixado por parametro: pid ' + $TargetPid + ' nome=' + $target.name)
 }
+
+# Heartbeat inicial ANTES de qualquer varredura cara (diff de processos/PEB,
+# snapshot, eventos, sessoes). Se o DSH morrer durante o boot, ja existe registro
+# de que o observador estava vivo, qual alvo seguia e quando iniciou.
+Write-Heartbeat
 
 # Registro inicial em cada categoria (garante arquivo existente para prova/teste).
 $day0 = Get-DataDay
@@ -672,6 +707,29 @@ $null = Add-JsonlRecord $ObsDir 'hash-sessoes' ([pscustomobject]@{
     changed = @()
 }) $day0
 
+# Alvo fixado por parametro: UM registro, sem PEB.
+if ($TargetPid -gt 0) {
+    $recT = [pscustomobject]@{
+        ts         = Get-IsoNow
+        event      = 'target_fixed'
+        pid        = $target.pid
+        ppid       = 0
+        name       = $target.name
+        cmdline    = $null
+        start      = $target.start
+        ancestors  = @()
+        suspect    = $false
+        reasons    = @('parametro_targetpid')
+        target_pid = $target.pid
+        fonte      = 'parametro'
+        error      = $null
+    }
+    $lineT = Add-JsonlRecord $ObsDir 'processos' $recT $day0
+    Add-RecentProc $recT $lineT ('processos-' + $day0.ToString('yyyy-MM-dd') + '.jsonl')
+    # O alvo entra no cache para o registro de saida (name/start ja conhecidos).
+    $script:ProcCache[[int]$target.pid] = $recT
+}
+
 Invoke-Cleanup
 # Libera o working set ja no startup (o primeiro poll ainda vai alocar um pouco).
 Trim-ObserverMemory
@@ -679,7 +737,7 @@ $script:LastTrim = Get-IsoNow
 $nextSnapshot = Get-Date
 $nextEvent = (Get-Date).AddSeconds(2)
 $nextSession = (Get-Date).AddSeconds(3)
-$nextHeartbeat = Get-Date
+$nextHeartbeat = (Get-Date).AddSeconds($HeartbeatSec)
 $nextCleanup = (Get-Date).AddMinutes(10)
 $nextTrim = (Get-Date).AddSeconds(15)
 $script:LastProcPoll = (Get-Date).AddDays(-1)
