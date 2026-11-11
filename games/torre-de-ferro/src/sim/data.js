@@ -1,48 +1,214 @@
 // Dados canônicos e balanceamento — Torre de Ferro.
-// Fonte: especificação fechada (issue #18). NÃO invente números.
-// Ajustes de balanceamento só pela cláusula de escape (±20% em HP base,
-// recompensas e bônus), documentados no README em "Balancete final".
-// BALANCETE FINAL (autorizado além dos ±20%; ver README): HP base ×0,84 e
-// recompensas ×1,15 em todos os inimigos, e caixa inicial por mapa
-// (START_MONEY_PER_MAP: deserto 350, neve 350, cidade 800). Motivo: com os
-// números exatos o bot de referência não vencia Neve (caía na onda 11) nem a
-// Cidade (caía na onda 18); com o ajuste vence Deserto (20 vidas), Neve (8) e
-// Cidade (7). Fórmula de HP, velocidades, danos, cadências, ondas, torres e
-// tropas permanecem exatamente como na issue.
+// Fonte: especificação fechada original (issue #18) + expansão da campanha
+// (issue #20): 20 fases × 2 ondas = 40 ondas, progressão de recursos e
+// desbloqueios por fase. NÃO invente números além do que está especificado.
+//
+// BALANCETE DA EXPANSÃO (documentado no README, seção "Balancete da expansão"):
+// a composição das 40 ondas deriva das 24 ondas originais, reorganizada em
+// 2 ondas por fase e escalada; HP base ×0,84 e recompensas base ×1,15 da
+// issue #18 seguem valendo (números finais da tabela ENEMIES). A curva de HP
+// usa o número da onda global (1..40) e foi ajustada para o bot de referência
+// vencer as 20 fases com vidas ≥ 8 por fase.
 
 export const STEP = 1 / 60;
-export const START_MONEY = 350;
-// Caixa inicial por mapa (divergência autorizada da especificação: a Cidade é
-// matematicamente invencível com 350 nas ondas 17–24 — ver "Balancete final" no
-// README). O engine usa este valor quando `money` não é passado explicitamente;
-// START_MONEY permanece 350 por compatibilidade.
-export const START_MONEY_PER_MAP = { deserto: 350, neve: 350, cidade: 800 };
+// Caixa inicial da fase 1 (a fórmula da issue #20 é
+// 300 + 25×(fase−1) + bônusPermanente; ver startingMoneyFor).
+export const START_MONEY = 300;
 export const START_LIVES = 20;
 export const PREP_TIME = 25;
-export const WAVES_PER_MAP = 8;
-export const TOTAL_WAVES = 24;
-export const HP_SCALE = 0.18;
+export const HP_SCALE = 0.03;
 export const SELL_RATE = 0.7;
 export const SLOW_CAP = 0.6;
+
+// ---------------------------------------------------------------- campanha
+export const TOTAL_PHASES = 20;
+export const WAVES_PER_PHASE = 2;
+export const TOTAL_WAVES = TOTAL_PHASES * WAVES_PER_PHASE;
 
 export const MAP_ORDER = ['deserto', 'neve', 'cidade'];
 export const MAP_NAMES = { deserto: 'Deserto', neve: 'Neve', cidade: 'Cidade' };
 
-export function waveBonus(w) {
+// Fases 1–7 Deserto, 8–14 Neve, 15–20 Cidade (issue #20, fechado).
+export const PHASES_PER_SCENARIO = { deserto: 7, neve: 7, cidade: 6 };
+export const SCENARIO_PHASE_RANGES = {
+  deserto: { first: 1, last: 7 },
+  neve: { first: 8, last: 14 },
+  cidade: { first: 15, last: 20 },
+};
+
+// Chefes na 2ª onda das fases 5, 10, 15 e 20.
+// Classes pedidas: 5 = terrestre, 10 = aéreo, 15 = terrestre, 20 = mecha.
+// Tipos reaproveitados (sem inventar nomes): General de Ferro (terrestre),
+// Fortaleza Voadora (aérea) e Mecha Titã (mecha).
+export const BOSS_PHASES = {
+  5: 'chefe-deserto',
+  10: 'chefe-neve',
+  15: 'chefe-deserto',
+  20: 'chefe-cidade',
+};
+
+function clampInt(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/** Fase normalizada no intervalo 1..20 (fallback 1). */
+export function clampPhase(phase) {
+  return clampInt(phase, 1, TOTAL_PHASES, 1);
+}
+
+/** Cenário de uma fase (1..7 deserto, 8..14 neve, 15..20 cidade). */
+export function scenarioForPhase(phase) {
+  const p = clampPhase(phase);
+  if (p <= SCENARIO_PHASE_RANGES.deserto.last) return 'deserto';
+  if (p <= SCENARIO_PHASE_RANGES.neve.last) return 'neve';
+  return 'cidade';
+}
+
+/** Nome do cenário de uma fase. */
+export function scenarioNameForPhase(phase) {
+  return MAP_NAMES[scenarioForPhase(phase)];
+}
+
+/** Fases (números 1..20) de um cenário, na ordem. */
+export function phasesForScenario(scenarioId) {
+  const faixa = SCENARIO_PHASE_RANGES[scenarioId];
+  if (!faixa) return [];
+  const fases = [];
+  for (let p = faixa.first; p <= faixa.last; p += 1) fases.push(p);
+  return fases;
+}
+
+/** Lista das 20 fases com metadados: [{phase, scenario, scenarioName}]. */
+export const PHASES = Array.from({ length: TOTAL_PHASES }, (_, i) => {
+  const phase = i + 1;
+  const scenario = scenarioForPhase(phase);
+  return { phase, scenario, scenarioName: MAP_NAMES[scenario] };
+});
+
+/** Metadados de uma fase. */
+export function phaseInfo(phase) {
+  const p = clampPhase(phase);
+  const scenario = scenarioForPhase(p);
+  return { phase: p, scenario, scenarioName: MAP_NAMES[scenario] };
+}
+
+/** Número da onda global (1..40) de uma onda local de uma fase. */
+export function globalWaveFor(phase, waveInPhase) {
+  const p = clampPhase(phase);
+  const w = clampInt(waveInPhase, 1, WAVES_PER_PHASE, 1);
+  return (p - 1) * WAVES_PER_PHASE + w;
+}
+
+/** Chefe da 2ª onda de uma fase (tipo) ou null. */
+export function bossForPhase(phase) {
+  return BOSS_PHASES[clampPhase(phase)] || null;
+}
+
+/** Bônus ao concluir uma onda: 25 + 10 × onda global (1..40). */
+export function waveBonus(globalWave) {
+  const w = clampInt(globalWave, 0, TOTAL_WAVES, 0);
   return 25 + 10 * w;
 }
 
-export function hpForWave(baseHp, w) {
+/** HP de um inimigo na onda global informada (1..40). */
+export function hpForWave(baseHp, globalWave) {
+  const w = clampInt(globalWave, 1, TOTAL_WAVES, 1);
   return Math.round(baseHp * (1 + HP_SCALE * (w - 1)));
 }
 
+/** Estrelas ao vencer: 3 = 20 vidas, 2 = 14–19, 1 = 1–13, 0 = derrota. */
 export function starsForLives(lives) {
-  if (lives >= 20) return 3;
-  if (lives >= 14) return 2;
-  if (lives >= 1) return 1;
+  const v = clampInt(lives, 0, START_LIVES, 0);
+  if (v >= 20) return 3;
+  if (v >= 14) return 2;
+  if (v >= 1) return 1;
   return 0;
 }
 
+/** Faixa de "melhores vidas" coerente com as estrelas. */
+function bestLivesBandForStars(stars) {
+  const s = clampInt(stars, 1, 3, 1);
+  if (s === 3) return [20, 20];
+  if (s === 2) return [14, 19];
+  return [1, 13];
+}
+
+/** Normaliza "melhores vidas" para a faixa das estrelas (consistência do save). */
+export function bestLivesForStars(stars, bestLives) {
+  const [min, max] = bestLivesBandForStars(stars);
+  return Math.round(clampNum(bestLives, min, max, min));
+}
+
+// ---------------------------------------------------------------- progressão
+/** Bônus permanente: min(250, 25 × fases concluídas) — nunca regride. */
+export function bonusPermanentFor(completedPhases) {
+  const n = clampInt(completedPhases, 0, TOTAL_PHASES, 0);
+  return Math.min(250, 25 * n);
+}
+
+/** Caixa inicial: 300 + 25×(fase−1) + bônusPermanente. */
+export function startingMoneyFor(phase, bonusPermanent = 0) {
+  const p = clampPhase(phase);
+  const bonus = clampInt(bonusPermanent, 0, 250, 0);
+  return 300 + 25 * (p - 1) + bonus;
+}
+
+/** Multiplicador de recompensa por abate da fase: 1 + 0,05×(fase−1). */
+export function rewardMultiplier(phase) {
+  return 1 + 0.05 * (clampPhase(phase) - 1);
+}
+
+/** Recompensa por abate: round(valor base × (1 + 0,05×(fase−1))). */
+export function rewardFor(baseReward, phase) {
+  const base = Number(baseReward);
+  if (!Number.isFinite(base)) return 0;
+  return Math.round(base * rewardMultiplier(phase));
+}
+
+// ---------------------------------------------------------------- desbloqueios
+// Torres: metralhadora e morteiro na fase 1; antiaéreo na 2; tesla na 4;
+// criogênica na 6; míssil na 8.
+export const TOWER_UNLOCK_PHASE = {
+  metralhadora: 1,
+  morteiro: 1,
+  antiaereo: 2,
+  tesla: 4,
+  criogenica: 6,
+  missil: 8,
+};
+
+// Tropas: fuzileiros na fase 1; antiaérea na 3; sniper na 5.
+export const TROOP_UNLOCK_PHASE = {
+  fuzileiros: 1,
+  antiaerea: 3,
+  sniper: 5,
+};
+
+// Upgrades: nível 2 a partir da fase 2; nível 3 a partir da fase 5.
+export const UPGRADE_UNLOCK_PHASE = { 2: 2, 3: 5 };
+
+export function towerUnlocked(type, phase) {
+  const min = TOWER_UNLOCK_PHASE[type];
+  if (!min) return false;
+  return clampPhase(phase) >= min;
+}
+
+export function troopUnlocked(type, phase) {
+  const min = TROOP_UNLOCK_PHASE[type];
+  if (!min) return false;
+  return clampPhase(phase) >= min;
+}
+
+export function upgradeUnlocked(level, phase) {
+  const n = clampInt(level, 1, 3, 1);
+  if (n <= 1) return true;
+  const min = UPGRADE_UNLOCK_PHASE[n];
+  return Number.isFinite(min) ? clampPhase(phase) >= min : false;
+}
+
+// ---------------------------------------------------------------- inimigos
 // Inimigos: stats base (onda 1). cls: 'ground' | 'air'.
 // troopDps: dano por segundo a tropas bloqueadoras (chefes: raio 2,5 u).
 // radius: usado apenas para colisão visual/efeitos e para o splash.
@@ -187,27 +353,27 @@ export function towerInvested(type, level) {
 
 // Venda = floor(0,7 × total investido), em aritmética INTEIRA (a spec manda
 // floor(0,7×investido); com ponto flutuante 0,7×180 dava 125 e 0,7×330 dava
-// 230 — $1 a menos nas combinações de investido 180 e 330). Correção de
-// arredondamento, não é balanceamento.
+// 230 — $1 a menos nas combinações de investido 180 e 330).
 export function sellValue(type, level) {
   return Math.floor((towerInvested(type, level) * 7) / 10);
 }
 
-// ---------------------------------------------------------------- save
-export const SAVE_KEY = 'td3d:save:v1';
+// ---------------------------------------------------------------- save v2
+// Schema v2 (issue #20): fases concluídas, estrelas por fase, bônusPermanente,
+// configurações. Sem save no meio da partida. Migra o schema v1 (mapas).
+export const SAVE_KEY = 'td3d:save:v2';
+export const LEGACY_SAVE_KEY = 'td3d:save:v1';
+export const SAVE_VERSION = 2;
 
-const MAP_DEFAULT = { unlocked: false, stars: 0, wavesWon: 0, bestLives: 0 };
+const PHASE_DEFAULT = { completed: false, stars: 0, bestLives: 0 };
 
 export function createDefaultSave() {
   return {
-    version: 1,
+    version: SAVE_VERSION,
     tutorialDone: false,
     settings: { volume: 0.7, muted: false, speed: 1 },
-    maps: {
-      deserto: { ...MAP_DEFAULT, unlocked: true },
-      neve: { ...MAP_DEFAULT },
-      cidade: { ...MAP_DEFAULT },
-    },
+    bonusPermanent: 0,
+    phases: Array.from({ length: TOTAL_PHASES }, () => ({ ...PHASE_DEFAULT })),
     totals: { kills: 0, waves: 0, timePlayed: 0 },
   };
 }
@@ -218,71 +384,142 @@ function clampNum(value, min, max, fallback) {
   return Math.min(max, Math.max(min, n));
 }
 
-function sanitizeMap(raw, fallback) {
-  const src = raw && typeof raw === 'object' ? raw : {};
-  return {
-    unlocked: typeof src.unlocked === 'boolean' ? src.unlocked : fallback.unlocked,
-    stars: Math.round(clampNum(src.stars, 0, 3, fallback.stars)),
-    wavesWon: Math.round(clampNum(src.wavesWon, 0, WAVES_PER_MAP, fallback.wavesWon)),
-    bestLives: Math.round(clampNum(src.bestLives, 0, START_LIVES, fallback.bestLives)),
-  };
-}
-
-// Valida o save no boot: deep merge com os defaults, descartando lixo e
-// reaplicando as regras de desbloqueio (Deserto livre; Neve após Deserto;
-// Cidade após Neve).
-export function validateSave(raw) {
-  let src = null;
+function parseSaveRaw(raw) {
   if (typeof raw === 'string') {
     try {
-      src = JSON.parse(raw);
+      return JSON.parse(raw);
     } catch (err) {
-      src = null;
+      return null;
     }
-  } else if (raw && typeof raw === 'object') {
-    src = raw;
   }
-  const save = createDefaultSave();
-  if (!src || typeof src !== 'object') return save;
+  if (raw && typeof raw === 'object') return raw;
+  return null;
+}
 
-  if (typeof src.tutorialDone === 'boolean') save.tutorialDone = src.tutorialDone;
+function copySettingsAndTotals(save, src) {
   const settings = src.settings && typeof src.settings === 'object' ? src.settings : {};
   save.settings.volume = clampNum(settings.volume, 0, 1, save.settings.volume);
   save.settings.muted = typeof settings.muted === 'boolean' ? settings.muted : false;
   save.settings.speed = settings.speed === 2 ? 2 : 1;
-
-  const maps = src.maps && typeof src.maps === 'object' ? src.maps : {};
-  for (const id of MAP_ORDER) {
-    save.maps[id] = sanitizeMap(maps[id], save.maps[id]);
-  }
-  // Regras de desbloqueio não confiam no arquivo: derivadas do progresso real.
-  save.maps.deserto.unlocked = true;
-  save.maps.neve.unlocked = save.maps.deserto.stars >= 1
-    && save.maps.deserto.wavesWon >= WAVES_PER_MAP;
-  save.maps.cidade.unlocked = save.maps.neve.stars >= 1
-    && save.maps.neve.wavesWon >= WAVES_PER_MAP;
-  if (!save.maps.neve.unlocked) { save.maps.neve.stars = 0; save.maps.neve.wavesWon = 0; save.maps.neve.bestLives = 0; }
-  if (!save.maps.cidade.unlocked) { save.maps.cidade.stars = 0; save.maps.cidade.wavesWon = 0; save.maps.cidade.bestLives = 0; }
-
   const totals = src.totals && typeof src.totals === 'object' ? src.totals : {};
   save.totals.kills = Math.round(clampNum(totals.kills, 0, Number.MAX_SAFE_INTEGER, 0));
   save.totals.waves = Math.round(clampNum(totals.waves, 0, Number.MAX_SAFE_INTEGER, 0));
   save.totals.timePlayed = Math.round(clampNum(totals.timePlayed, 0, Number.MAX_SAFE_INTEGER, 0));
-  save.version = 1;
+}
+
+function sanitizePhase(raw, fallback = PHASE_DEFAULT) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const stars = clampInt(src.stars, 0, 3, fallback.stars);
+  const concluida = src.completed === true || stars >= 1;
+  if (!concluida) return { ...PHASE_DEFAULT };
+  // Uma fase concluída sempre rendeu ao menos 1 estrela (vitória).
+  const estrelas = Math.max(1, stars);
+  return {
+    completed: true,
+    stars: estrelas,
+    bestLives: bestLivesForStars(estrelas, clampNum(src.bestLives, 0, START_LIVES, 0)),
+  };
+}
+
+// Migra o save v1 (progresso por mapa, 8 ondas cada) para fases 1..20.
+// Regra documentada no README: por cenário, floor(wavesWon/8 × fasesDoCenário)
+// fases concluídas; mapa 100% concluído mantém as estrelas antigas; progresso
+// parcial vira 1 estrela por fase derivada (sem inventar notas altas).
+export function migrateSaveV1(src) {
+  const save = createDefaultSave();
+  const v1 = src && typeof src === 'object' ? src : {};
+  if (typeof v1.tutorialDone === 'boolean') save.tutorialDone = v1.tutorialDone;
+  copySettingsAndTotals(save, v1);
+  const maps = v1.maps && typeof v1.maps === 'object' ? v1.maps : {};
+  // O save v1 só tinha progresso alcançável: Neve exigia Deserto vencido e
+  // Cidade exigia Neve vencida. Progresso "solto" de um cenário bloqueado é
+  // lixo e não pode inflar o bônus permanente (nem criar fases fora de ordem).
+  let faseBase = 0;
+  let anteriorConcluido = true;
+  for (const mapId of MAP_ORDER) {
+    const qtdFases = PHASES_PER_SCENARIO[mapId];
+    const mapa = maps[mapId] && typeof maps[mapId] === 'object' ? maps[mapId] : {};
+    const alcancavel = mapId === MAP_ORDER[0] || anteriorConcluido;
+    const wavesWon = alcancavel ? Math.round(clampNum(mapa.wavesWon, 0, 8, 0)) : 0;
+    const mapaConcluido = wavesWon >= 8;
+    const concluidas = mapaConcluido
+      ? qtdFases
+      : Math.min(qtdFases, Math.floor((wavesWon / 8) * qtdFases + 1e-9));
+    const estrelas = mapaConcluido ? Math.max(1, clampInt(mapa.stars, 0, 3, 1)) : 1;
+    const melhores = mapaConcluido
+      ? bestLivesForStars(estrelas, clampNum(mapa.bestLives, 0, START_LIVES, 0))
+      : 1;
+    for (let i = 0; i < concluidas; i += 1) {
+      save.phases[faseBase + i] = { completed: true, stars: estrelas, bestLives: melhores };
+    }
+    faseBase += qtdFases;
+    anteriorConcluido = alcancavel && mapaConcluido;
+  }
+  // Bônus derivado do prefixo contínuo de fases realmente alcançáveis.
+  save.bonusPermanent = bonusPermanentFor(completedPhaseCount(save));
   return save;
 }
 
-// Registra o resultado de uma partida no save (vitória). Retorna o save novo.
-export function applyVictory(save, mapId, lives) {
+export function completedPhaseCount(save) {
+  if (!save || !Array.isArray(save.phases)) return 0;
+  let n = 0;
+  for (const fase of save.phases) if (fase && fase.completed === true) n += 1;
+  return n;
+}
+
+export function isPhaseUnlocked(save, phase) {
+  const p = clampPhase(phase);
+  if (p <= 1) return true;
+  if (!save || !Array.isArray(save.phases)) return false;
+  const anterior = save.phases[p - 2];
+  return Boolean(anterior && anterior.completed === true);
+}
+
+// Valida o save no boot: deep merge com os defaults, descarta lixo e migra v1.
+// Progressão é sequencial: se uma fase não foi concluída, todas as seguintes
+// são redefinidas (não confia no arquivo do localStorage).
+export function validateSave(raw) {
+  let src = parseSaveRaw(raw);
+  if (!src) return createDefaultSave();
+  if (src.version === 1 || (!Array.isArray(src.phases) && src.maps)) {
+    src = migrateSaveV1(src);
+  }
+  const save = createDefaultSave();
+  if (typeof src.tutorialDone === 'boolean') save.tutorialDone = src.tutorialDone;
+  copySettingsAndTotals(save, src);
+
+  const fases = Array.isArray(src.phases) ? src.phases : [];
+  for (let i = 0; i < TOTAL_PHASES; i += 1) {
+    save.phases[i] = sanitizePhase(fases[i], PHASE_DEFAULT);
+  }
+  // Progressão sequencial: mantém o prefixo contínuo de fases concluídas.
+  let anteriorConcluida = true;
+  for (let i = 0; i < TOTAL_PHASES; i += 1) {
+    if (!anteriorConcluida) save.phases[i] = { ...PHASE_DEFAULT };
+    anteriorConcluida = save.phases[i].completed === true;
+  }
+
+  const concluidas = completedPhaseCount(save);
+  const bonusSalvo = clampInt(src.bonusPermanent, 0, 250, 0);
+  // Bônus permanente nunca regride: vale o maior entre o salvo e o derivado.
+  save.bonusPermanent = Math.max(bonusSalvo, bonusPermanentFor(concluidas));
+  save.version = SAVE_VERSION;
+  return save;
+}
+
+// Registra a vitória de uma fase. Retorna o save novo (não muta o original).
+export function applyPhaseVictory(save, phase, lives) {
   const next = validateSave(save);
-  const map = next.maps[mapId];
-  if (!map) return next;
+  const p = clampPhase(phase);
+  if (!isPhaseUnlocked(next, p)) return next;
+  const fase = next.phases[p - 1];
   const stars = starsForLives(lives);
-  map.wavesWon = WAVES_PER_MAP;
-  if (stars > map.stars) map.stars = stars;
-  if (lives > map.bestLives) map.bestLives = lives;
-  next.totals.waves += WAVES_PER_MAP;
-  if (mapId === 'deserto') next.maps.neve.unlocked = true;
-  if (mapId === 'neve') next.maps.cidade.unlocked = true;
+  if (stars > 0) {
+    fase.completed = true;
+    if (stars > fase.stars) fase.stars = stars;
+    if (lives > fase.bestLives) fase.bestLives = lives;
+    next.bonusPermanent = bonusPermanentFor(completedPhaseCount(next));
+    next.totals.waves += WAVES_PER_PHASE;
+  }
   return next;
 }

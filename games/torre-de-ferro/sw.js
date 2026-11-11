@@ -1,6 +1,6 @@
 /* Torre de Ferro — service worker (instalável e offline após a 1ª visita).
    Sem dependências; mesma origem apenas. Versão: subir VERSAO ao mudar os arquivos. */
-const VERSAO = 'td3d-2026-11-10';
+const VERSAO = 'td3d-2026-11-10-campanha20';
 const CACHE = `torre-de-ferro-${VERSAO}`;
 
 const ESSENCIAIS = [

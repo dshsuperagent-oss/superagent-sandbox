@@ -8,17 +8,27 @@ Este repositorio e um sandbox de testes do dsh-superagent.
 ## Torre de Ferro — Defesa do Último Posto
 
 Jogo 3D de defesa de torre no navegador, em pt-BR, em
-[`games/torre-de-ferro/`](games/torre-de-ferro/README.md): 3 setores × 8 ondas,
-10 inimigos (4 aéreos, chefes nas ondas 8/16/24), 6 torres com 3 níveis, 3 tropas
-especiais, áudio 100% sintetizado e save local. WebGL com Three.js vendorizado,
-sem build e sem dependências. Rode `node games/torre-de-ferro/serve.mjs` e abra
-<http://127.0.0.1:8099/>.
+[`games/torre-de-ferro/`](games/torre-de-ferro/README.md): **campanha de 20 fases ×
+2 ondas = 40 ondas** em 3 cenários (Deserto 1–7, Neve 8–14, Cidade 15–20), **chefes
+nas fases 5/10/15/20**, **progressão de recursos** por fase (caixa inicial, recompensa
+por abate e bônus por onda), **desbloqueios** de torres/tropas/upgrades por fase e save
+v2 com migração do v1. São 10 inimigos (4 aéreos), 6 torres com 3 níveis, 3 tropas
+especiais, áudio 100% sintetizado e efeitos procedurais. WebGL com Three.js
+vendorizado, sem build e sem dependências. Rode `node games/torre-de-ferro/serve.mjs` e
+abra <http://127.0.0.1:8099/>.
 
 Também **instalável como app (PWA)** no Android/iPad e com controles de toque:
 <https://dshsuperagent-oss.github.io/superagent-sandbox/>. No Windows, o instalador com
 atalho no Desktop e Menu Iniciar está no projeto local (`Instalar Torre de Ferro.cmd`).
+A seleção de missão mostra as **20 fases agrupadas por cenário** com estrelas e
+cadeados, a HUD mostra **`Fase n/20 · Onda m/2`** e a correção do bug mobile
+**BUG-MOB-04** (barra do chefe não cobre mais a HUD em toque) está coberta por teste
+automatizado; detalhes, tabelas e screenshots em
+[`games/torre-de-ferro/README.md`](games/torre-de-ferro/README.md).
 
 ![Menu do Torre de Ferro](games/torre-de-ferro/docs/screenshots/menu.png)
+
+![Seleção das 20 fases agrupadas por cenário](games/torre-de-ferro/docs/screenshots/missoes-20-fases.png)
 
 ## Editor de mapas mentais (v2)
 

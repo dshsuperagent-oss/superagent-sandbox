@@ -25,13 +25,13 @@
         <div class="menu-selo" aria-hidden="true">✦</div>
         <h1 id="menu-titulo">Torre de Ferro</h1>
         <p class="menu-subtitulo">Defesa do Último Posto</p>
-        <p class="menu-chamada">Segure as últimas linhas do último posto. 3 setores, 24 ondas, zero reforços.</p>
+        <p class="menu-chamada">Segure as últimas linhas do último posto. 20 fases, 3 cenários, 40 ondas, zero reforços.</p>
         <div class="menu-botoes">
           <button id="btn-iniciar" class="botao botao--forte" type="button">Iniciar Campanha</button>
           <button id="btn-missoes" class="botao" type="button">Selecionar Missão</button>
           <button id="btn-controles" class="botao botao--fraco" type="button">Controles</button>
         </div>
-        <p class="menu-rodape">3 cenários · 24 ondas · 6 torres · 3 tropas especiais</p>
+        <p class="menu-rodape">20 fases · 3 cenários · 40 ondas · 6 torres · 3 tropas especiais</p>
       </div>
     </div>
 
@@ -39,8 +39,9 @@
     <div id="screen-maps" class="screen screen--overlay" data-screen="maps">
       <div class="painel painel--missao">
         <h2>Selecionar Missão</h2>
-        <p class="painel-dica">Complete um setor para liberar o próximo. Estrelas medem as vidas que restaram.</p>
-        <div id="map-list" class="map-list"><!-- cards gerados por hud.js --></div>
+        <p class="painel-dica">Complete uma fase para liberar a próxima. Estrelas medem as vidas que restaram.</p>
+        <p id="map-progresso" class="map-progresso">0/20 fases concluídas · 0/60 estrelas</p>
+        <div id="map-list" class="map-list"><!-- cards das 20 fases gerados por hud.js --></div>
         <div class="painel-acoes">
           <button id="btn-voltar-menu" class="botao botao--fraco" type="button">Voltar ao menu</button>
         </div>
@@ -58,10 +59,10 @@
           <span class="hud-icone hud-icone--vida">♥</span>
           <span id="hud-vidas" class="hud-valor">20</span>
         </div>
-        <div class="hud-recurso hud-recurso--onda" title="Onda">
-          <span id="hud-onda" class="hud-valor">Onda 1/8</span>
+        <div class="hud-recurso hud-recurso--onda" title="Fase e onda">
+          <span id="hud-onda" class="hud-valor">Fase 1/20 · Onda 1/2</span>
         </div>
-        <div class="hud-recurso hud-recurso--mapa" title="Setor">
+        <div class="hud-recurso hud-recurso--mapa" title="Cenário">
           <span id="hud-mapa" class="hud-valor">Deserto</span>
         </div>
         <div class="hud-botoes">
@@ -187,7 +188,7 @@
       <div id="tutorial" class="tutorial" hidden>
         <div class="tutorial-caixa">
           <p id="tutorial-passo" class="tutorial-passo">Passo 1 de 6</p>
-          <p id="tutorial-texto" class="tutorial-texto">Clique em um slot vazio para construir sua primeira torre.</p>
+          <p id="tutorial-texto" class="tutorial-texto">Bem-vindo ao último posto, comandante! São 20 fases e 2 ondas por fase. Construa torres nos círculos claros ao lado do caminho.</p>
           <button id="btn-tutorial-ok" class="botao botao--forte" type="button">Entendi</button>
         </div>
       </div>
@@ -196,13 +197,29 @@
     <!-- ================= VITÓRIA ================= -->
     <div id="screen-victory" class="screen screen--overlay" data-screen="victory" hidden>
       <div class="painel painel--fim">
-        <h2 class="titulo-fim">Setor defendido!</h2>
-        <p id="vitoria-mapa" class="fim-mapa">Deserto</p>
+        <h2 class="titulo-fim">Fase defendida!</h2>
+        <p id="vitoria-mapa" class="fim-mapa">Fase 1/20 · Deserto</p>
         <p class="fim-resumo">Vidas restantes: <strong id="vitoria-vidas">20</strong></p>
         <p id="vitoria-estrelas" class="fim-estrelas">★★★</p>
         <div class="painel-acoes">
           <button id="btn-proxima-missao" class="botao botao--forte" type="button">Próxima missão</button>
           <button id="btn-vitoria-missoes" class="botao" type="button">Selecionar missão</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= CAMPANHA CONCLUÍDA (fase 20) ================= -->
+    <div id="screen-campanha" class="screen screen--overlay" data-screen="campanha" hidden>
+      <div class="painel painel--fim painel--campanha">
+        <p class="campanha-selo" aria-hidden="true">✦</p>
+        <h2 class="titulo-fim">Campanha concluída!</h2>
+        <p class="fim-mapa">20 fases · 3 cenários · 40 ondas</p>
+        <p id="campanha-fases" class="fim-resumo">20/20 fases concluídas</p>
+        <p class="fim-resumo">Estrelas totais: <strong id="campanha-estrelas">60/60</strong></p>
+        <p id="campanha-detalhe" class="fim-resumo">O último posto resistiu. O general merece um descanso.</p>
+        <div class="painel-acoes">
+          <button id="btn-campanha-missoes" class="botao botao--forte" type="button">Selecionar missão</button>
+          <button id="btn-campanha-menu" class="botao" type="button">Menu</button>
         </div>
       </div>
     </div>
@@ -244,7 +261,7 @@
               <li>Arrastar com o botão direito: deslocar a câmera</li>
               <li>Roda do mouse: aproximar e afastar</li>
               <li>Clique em slot vazio: construir · clique em torre: painel</li>
-              <li>Botões 1 a 6: constroem a torre correspondente no slot selecionado</li>
+              <li>Botões 1 a 6: constroem a torre correspondente no slot selecionado (as bloqueadas avisam a fase de desbloqueio)</li>
               <li>Botões 7, 8 e 9: posicionam fuzileiros, antiaérea e sniper</li>
               <li>U melhora · V vende · N inicia a onda · F alterna 1x/2x</li>
               <li>Espaço pausa · M alterna o som · H abre a ajuda · Esc fecha</li>
@@ -253,11 +270,12 @@
           <div>
             <h3>Como jogar</h3>
             <ul class="lista-ajuda">
-              <li>Construa torres durante a preparação e durante a onda.</li>
+              <li>São <strong>20 fases</strong> em 3 cenários (Deserto 1–7, Neve 8–14, Cidade 15–20), com <strong>2 ondas por fase</strong> (40 ondas).</li>
+              <li>Construa torres durante a preparação e durante a onda. A caixa inicial cresce a cada fase e o bônus permanente não regride.</li>
               <li>Torres terrestres não atingem inimigos aéreos; use antiaéreo, tesla, criogênica ou míssil.</li>
-              <li>Cada onda concluída rende um bônus. A caixa não passa de um setor para o outro.</li>
-              <li>Vidas no fim do setor definem as estrelas: 3 = 20 vidas, 2 = 14 a 19, 1 = 1 a 13.</li>
-              <li>Chefes aparecem nas ondas 8, 16 e 24 e resistem à metade da lentidão.</li>
+              <li>Desbloqueios por fase: antiaéreo na 2, tesla na 4, criogênica na 6, míssil na 8; tropas antiaérea na 3 e sniper na 5; melhoria nível 2 na fase 2 e nível 3 na fase 5.</li>
+              <li>Chefes aparecem na 2ª onda das fases <strong>5, 10, 15 e 20</strong> (terrestre, aéreo, terrestre e mecha) e resistem à metade da lentidão.</li>
+              <li>Vidas no fim da fase definem as estrelas: 3 = 20 vidas, 2 = 14 a 19, 1 = 1 a 13. Complete uma fase para liberar a próxima.</li>
             </ul>
           </div>
         </div>
