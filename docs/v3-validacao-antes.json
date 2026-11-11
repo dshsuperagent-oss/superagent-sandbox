@@ -1,0 +1,677 @@
+{
+  "schemaVersion": 1,
+  "generator": "blender-director/validate.py",
+  "generatedAt": "2026-11-04T22:53:55Z",
+  "ok": false,
+  "rules": {
+    "containment": 1,
+    "support": 5,
+    "intersection": 6,
+    "camera-distance": 9,
+    "inventory": 1,
+    "framing": 4,
+    "layout": 1,
+    "assets": 10
+  },
+  "errors": [
+    {
+      "rule": "containment",
+      "message": "planta-janela sai do volume interno no eixo x (min -1.842, max -1.298)",
+      "ids": [
+        "planta-janela"
+      ],
+      "detail": {
+        "bbox": {
+          "min": [
+            -1.842020725388601,
+            -0.3933012583271651,
+            0.0
+          ],
+          "max": [
+            -1.297979274611399,
+            0.1933012583271651,
+            1.25
+          ]
+        },
+        "limits": {
+          "min": [
+            -1.81,
+            -2.4099999999999997,
+            -0.01
+          ],
+          "max": [
+            1.81,
+            2.4099999999999997,
+            2.76
+          ]
+        }
+      }
+    },
+    {
+      "rule": "support",
+      "message": "livro-prateleira-1 deveria apoiar em outro móvel, mas não toca nenhum topo (base z=1.940)",
+      "ids": [
+        "livro-prateleira-1"
+      ],
+      "detail": {}
+    },
+    {
+      "rule": "support",
+      "message": "livro-prateleira-2 deveria apoiar em outro móvel, mas não toca nenhum topo (base z=1.940)",
+      "ids": [
+        "livro-prateleira-2"
+      ],
+      "detail": {}
+    },
+    {
+      "rule": "support",
+      "message": "livro-prateleira-3 deveria apoiar em outro móvel, mas não toca nenhum topo (base z=1.940)",
+      "ids": [
+        "livro-prateleira-3"
+      ],
+      "detail": {}
+    },
+    {
+      "rule": "support",
+      "message": "livro-prateleira-4 deveria apoiar em outro móvel, mas não toca nenhum topo (base z=1.940)",
+      "ids": [
+        "livro-prateleira-4"
+      ],
+      "detail": {}
+    },
+    {
+      "rule": "support",
+      "message": "vaso-prateleira deveria apoiar em outro móvel, mas não toca nenhum topo (base z=1.940)",
+      "ids": [
+        "vaso-prateleira"
+      ],
+      "detail": {}
+    },
+    {
+      "rule": "intersection",
+      "message": "painel-madeira penetra planta-janela em x=0.020, y=0.587, z=0.800 m",
+      "ids": [
+        "painel-madeira",
+        "planta-janela"
+      ],
+      "detail": {
+        "overlap": [
+          0.020000000000000018,
+          0.5866025166543303,
+          0.8
+        ]
+      }
+    },
+    {
+      "rule": "intersection",
+      "message": "rack-base penetra planta-janela em x=0.450, y=0.587, z=0.520 m",
+      "ids": [
+        "rack-base",
+        "planta-janela"
+      ],
+      "detail": {
+        "overlap": [
+          0.4500000000000002,
+          0.5866025166543303,
+          0.52
+        ]
+      }
+    },
+    {
+      "rule": "intersection",
+      "message": "rack-gavetas penetra planta-janela em x=0.030, y=0.587, z=0.340 m",
+      "ids": [
+        "rack-gavetas",
+        "planta-janela"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.5866025166543303,
+          0.34
+        ]
+      }
+    },
+    {
+      "rule": "intersection",
+      "message": "tv penetra prateleira-1 em x=0.035, y=0.075, z=0.040 m",
+      "ids": [
+        "tv",
+        "prateleira-1"
+      ],
+      "detail": {
+        "overlap": [
+          0.03500000000000014,
+          0.07500000000000007,
+          0.040000000000000036
+        ]
+      }
+    },
+    {
+      "rule": "intersection",
+      "message": "tv penetra planta-janela em x=0.070, y=0.587, z=0.320 m",
+      "ids": [
+        "tv",
+        "planta-janela"
+      ],
+      "detail": {
+        "overlap": [
+          0.06999999999999984,
+          0.5866025166543303,
+          0.31999999999999995
+        ]
+      }
+    },
+    {
+      "rule": "intersection",
+      "message": "sanca-janela penetra spot-teto em x=0.160, y=0.160, z=0.060 m",
+      "ids": [
+        "sanca-janela",
+        "spot-teto"
+      ],
+      "detail": {
+        "overlap": [
+          0.16,
+          0.16000000000000014,
+          0.05999999999999961
+        ]
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.680 m de sofa-base (mínimo 1.0 m)",
+      "ids": [
+        "sofa-base"
+      ],
+      "detail": {
+        "distance": 0.68
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.500 m de sofa-assento (mínimo 1.0 m)",
+      "ids": [
+        "sofa-assento"
+      ],
+      "detail": {
+        "distance": 0.5
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.214 m de sofa-encosto (mínimo 1.0 m)",
+      "ids": [
+        "sofa-encosto"
+      ],
+      "detail": {
+        "distance": 0.2143
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.455 m de sofa-braco-sul (mínimo 1.0 m)",
+      "ids": [
+        "sofa-braco-sul"
+      ],
+      "detail": {
+        "distance": 0.4554
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.041 m de almofada-sul (mínimo 1.0 m)",
+      "ids": [
+        "almofada-sul"
+      ],
+      "detail": {
+        "distance": 0.0414
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.908 m de assento-1 (mínimo 1.0 m)",
+      "ids": [
+        "assento-1"
+      ],
+      "detail": {
+        "distance": 0.908
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.390 m de assento-2 (mínimo 1.0 m)",
+      "ids": [
+        "assento-2"
+      ],
+      "detail": {
+        "distance": 0.39
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.418 m de encosto-2 (mínimo 1.0 m)",
+      "ids": [
+        "encosto-2"
+      ],
+      "detail": {
+        "distance": 0.4179
+      }
+    },
+    {
+      "rule": "camera-distance",
+      "message": "câmera a 0.150 m de encosto-3 (mínimo 1.0 m)",
+      "ids": [
+        "encosto-3"
+      ],
+      "detail": {
+        "distance": 0.15
+      }
+    },
+    {
+      "rule": "inventory",
+      "message": "spot-teto passa de 2.6 m e não está no inventário da referência",
+      "ids": [
+        "spot-teto"
+      ],
+      "detail": {
+        "top": 2.75
+      }
+    },
+    {
+      "rule": "framing",
+      "message": "\"mesa-centro-tampo\" não aparece inteiro no enquadramento",
+      "ids": [
+        "mesa-centro-tampo"
+      ],
+      "detail": {
+        "projected": [
+          [
+            0.22410546139359702,
+            -0.6892420633710298,
+            2.174604713592187
+          ],
+          [
+            0.22410546139359702,
+            -0.624912804123067,
+            2.174604713592187
+          ],
+          [
+            0.7794486215538848,
+            -0.9172619941103177,
+            1.63402501077831
+          ],
+          [
+            0.7794486215538848,
+            -0.8316508746600215,
+            1.63402501077831
+          ],
+          [
+            -0.4603174603174604,
+            -1.1618651925397356,
+            1.2900197453512976
+          ],
+          [
+            -0.4603174603174604,
+            -1.053424441236027,
+            1.2900197453512976
+          ],
+          [
+            0.2568306010928963,
+            -1.999931888797906,
+            0.7494400425374204
+          ],
+          [
+            0.2568306010928963,
+            -1.8132715791767682,
+            0.7494400425374204
+          ]
+        ]
+      }
+    },
+    {
+      "rule": "framing",
+      "message": "\"planta-janela\" não aparece inteiro no enquadramento",
+      "ids": [
+        "planta-janela"
+      ],
+      "detail": {
+        "projected": [
+          [
+            0.6055901995915752,
+            -0.7887753632120461,
+            2.9136362960856057
+          ],
+          [
+            0.6055901995915752,
+            0.06858916201843887,
+            2.9136362960856057
+          ],
+          [
+            0.9299913290640373,
+            -0.9129805912571987,
+            2.5172545284320176
+          ],
+          [
+            0.9299913290640373,
+            0.07938961663106084,
+            2.5172545284320176
+          ],
+          [
+            0.5071677715607568,
+            -0.9146740897929738,
+            2.5125938882043735
+          ],
+          [
+            0.5071677715607568,
+            0.07953687737330216,
+            2.5125938882043735
+          ],
+          [
+            0.8746107838382877,
+            -1.0859991327875824,
+            2.116212120550786
+          ],
+          [
+            0.8746107838382877,
+            0.09443470719892032,
+            2.116212120550786
+          ]
+        ]
+      }
+    },
+    {
+      "rule": "framing",
+      "message": "\"janela-sala\" não aparece inteiro no enquadramento",
+      "ids": [
+        "janela-sala"
+      ],
+      "detail": {
+        "projected": [
+          [
+            -0.3780193236714975,
+            -0.648287100185215,
+            3.3909090449234105
+          ],
+          [
+            -0.3780193236714975,
+            0.6482871001852151,
+            3.3909090449234105
+          ],
+          [
+            -0.3780193236714975,
+            -0.648287100185215,
+            3.3909090449234105
+          ],
+          [
+            -0.3780193236714975,
+            0.6482871001852151,
+            3.3909090449234105
+          ],
+          [
+            -1.0084175084175084,
+            -0.9036729275309058,
+            2.4326086626624464
+          ],
+          [
+            -1.0084175084175084,
+            0.903672927530906,
+            2.4326086626624464
+          ],
+          [
+            -1.0084175084175084,
+            -0.9036729275309058,
+            2.4326086626624464
+          ],
+          [
+            -1.0084175084175084,
+            0.903672927530906,
+            2.4326086626624464
+          ]
+        ]
+      }
+    },
+    {
+      "rule": "framing",
+      "message": "\"sofa-base\" não aparece inteiro no enquadramento",
+      "ids": [
+        "sofa-base"
+      ],
+      "detail": {
+        "projected": [
+          [
+            -0.9432655283980513,
+            -1.2321777676825756,
+            1.6705315866995647
+          ],
+          [
+            -0.9432655283980513,
+            -0.8134765844894675,
+            1.6705315866995647
+          ],
+          [
+            3.188932423689051,
+            -11.190719435045581,
+            0.18393740396140285
+          ],
+          [
+            3.188932423689051,
+            -7.38804778236019,
+            0.18393740396140285
+          ],
+          [
+            -2.369815642248644,
+            -2.0438948204658396,
+            1.0070928605188976
+          ],
+          [
+            -2.369815642248644,
+            -1.349367454288127,
+            1.0070928605188976
+          ],
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "rule": "layout",
+      "message": "retângulo projetado da janela difere da referência (IoU 0.000, centro 0.312)",
+      "ids": [
+        "janela-sala"
+      ],
+      "detail": {
+        "projected": [
+          -0.004208754208754217,
+          0.048163536234547,
+          0.3151990923730055,
+          0.9036729275309059
+        ],
+        "measured": [
+          0.367,
+          0.234,
+          0.196,
+          0.522
+        ],
+        "iou": 0.0,
+        "centerError": 0.3116
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "eixo do asset \"planta-janela\" (-1.57, -0.1, 0.0) está dentro de \"rack-base\"",
+      "ids": [
+        "planta-janela",
+        "rack-base"
+      ],
+      "detail": {
+        "axis": [
+          -1.57,
+          -0.1,
+          0.0
+        ],
+        "furnitureBbox": {
+          "min": [
+            -1.7950000000000002,
+            -1.4000000000000001,
+            0.0
+          ],
+          "max": [
+            -1.345,
+            1.2,
+            0.52
+          ]
+        }
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"painel-madeira\" em x=0.020, y=0.587, z=0.800 m",
+      "ids": [
+        "planta-janela",
+        "painel-madeira"
+      ],
+      "detail": {
+        "overlap": [
+          0.020000000000000018,
+          0.5866025166543303,
+          0.8
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"rack-base\" em x=0.450, y=0.587, z=0.520 m",
+      "ids": [
+        "planta-janela",
+        "rack-base"
+      ],
+      "detail": {
+        "overlap": [
+          0.4500000000000002,
+          0.5866025166543303,
+          0.52
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"rack-gavetas\" em x=0.030, y=0.587, z=0.340 m",
+      "ids": [
+        "planta-janela",
+        "rack-gavetas"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.5866025166543303,
+          0.34
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"tv\" em x=0.070, y=0.587, z=0.320 m",
+      "ids": [
+        "planta-janela",
+        "tv"
+      ],
+      "detail": {
+        "overlap": [
+          0.06999999999999984,
+          0.5866025166543303,
+          0.31999999999999995
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"ripa-06\" em x=0.030, y=0.088, z=0.790 m",
+      "ids": [
+        "planta-janela",
+        "ripa-06"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.08830125832716507,
+          0.79
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"ripa-07\" em x=0.030, y=0.190, z=0.790 m",
+      "ids": [
+        "planta-janela",
+        "ripa-07"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.19000000000000003,
+          0.79
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"ripa-08\" em x=0.030, y=0.190, z=0.790 m",
+      "ids": [
+        "planta-janela",
+        "ripa-08"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.19,
+          0.79
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"ripa-09\" em x=0.030, y=0.088, z=0.790 m",
+      "ids": [
+        "planta-janela",
+        "ripa-09"
+      ],
+      "detail": {
+        "overlap": [
+          0.029999999999999805,
+          0.0883012583271651,
+          0.79
+        ]
+      }
+    },
+    {
+      "rule": "assets",
+      "message": "volume do asset \"planta-janela\" penetra \"rodape-oeste\" em x=0.020, y=0.587, z=0.100 m",
+      "ids": [
+        "planta-janela",
+        "rodape-oeste"
+      ],
+      "detail": {
+        "overlap": [
+          0.020000000000000018,
+          0.5866025166543303,
+          0.1
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "summary": {
+    "objects": 63,
+    "openings": 1,
+    "errors": 37,
+    "warnings": 0,
+    "allowMissingAssets": true
+  },
+  "measurements": {
+    "intersectionTolerance": 0.02,
+    "supportGap": 0.02,
+    "cameraMinDistance": 1.0,
+    "inventoryHeight": 2.6,
+    "windowIouMin": 0.7
+  }
+}

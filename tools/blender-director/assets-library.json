@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "description": "Biblioteca de assets livres do Blender Director v3. O arquivo registra procedência e licença; nenhum binário é versionado. `node assets.js fetch` baixa os assets referenciados pelo room plan para assets/ (ignorado pelo git).",
+  "assetsDir": "assets",
+  "assets": {
+    "potted_plant_01": {
+      "name": "Potted Plant 01",
+      "kind": "model",
+      "format": "gltf",
+      "provider": "polyhaven",
+      "resolution": "1k",
+      "source": {
+        "url": "https://polyhaven.com/a/potted_plant_01",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      },
+      "notes": "Planta em vaso usada ao lado da janela. Modelo original em metros; o importador aceita fitHeight para normalizar.",
+      "bbox": {
+        "min": [
+          -0.339,
+          -0.27,
+          -0.014
+        ],
+        "max": [
+          0.249,
+          0.364,
+          1.337
+        ]
+      }
+    },
+    "fancy_picture_frame_01": {
+      "name": "Fancy Picture Frame 01",
+      "kind": "model",
+      "format": "gltf",
+      "provider": "polyhaven",
+      "resolution": "1k",
+      "source": {
+        "url": "https://polyhaven.com/a/fancy_picture_frame_01",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      },
+      "notes": "Quadro de parede. A moldura fica na parede oeste, acima do sofá.",
+      "bbox": {
+        "min": [
+          -0.302,
+          -0.022,
+          -0.232
+        ],
+        "max": [
+          0.302,
+          -0.002,
+          0.232
+        ]
+      }
+    },
+    "modern_ceiling_lamp_01": {
+      "name": "Modern Ceiling Lamp 01",
+      "kind": "model",
+      "format": "gltf",
+      "provider": "polyhaven",
+      "resolution": "1k",
+      "source": {
+        "url": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      },
+      "notes": "Luminária de teto usada como objeto; a emissão real vem das luminárias do light rig.",
+      "bbox": {
+        "min": [
+          -0.216,
+          -0.218,
+          0.221
+        ],
+        "max": [
+          0.216,
+          0.214,
+          1.173
+        ]
+      }
+    },
+    "sky_day": {
+      "name": "Kloofendal 48d Partly Cloudy (Pure Sky)",
+      "kind": "hdri",
+      "format": "hdr",
+      "provider": "polyhaven",
+      "resolution": "2k",
+      "source": {
+        "url": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      },
+      "notes": "Céu de dia, sem geometria de terreno, para o mundo e para a janela.",
+      "providerId": "kloofendal_48d_partly_cloudy_puresky"
+    },
+    "sky_dusk": {
+      "name": "Belfast Sunset (Pure Sky)",
+      "kind": "hdri",
+      "format": "hdr",
+      "provider": "polyhaven",
+      "resolution": "2k",
+      "source": {
+        "url": "https://polyhaven.com/a/belfast_sunset_puresky",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      },
+      "notes": "Céu de fim de tarde para o preset dusk.",
+      "providerId": "belfast_sunset_puresky"
+    }
+  }
+}

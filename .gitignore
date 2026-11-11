@@ -1,3 +1,8 @@
 node_modules/
 test-results/
 playwright-report/
+tools/blender-director/assets/
+tools/blender-director/runs/
+tools/blender-director/__pycache__/
+*.pyc
+/runs/

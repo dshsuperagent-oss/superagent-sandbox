@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "generator": "blender-director/build_room.py",
+  "createdAt": "2026-11-04T23:11:00Z",
+  "updatedAt": "2026-11-04T23:11:00Z",
+  "blenderVersion": "5.2.3 LTS",
+  "planName": "Sala de estar — apartamento com janela central",
+  "summary": {
+    "walls": 4,
+    "openings": 1,
+    "furniture": 60,
+    "assets": 2,
+    "lights": 3,
+    "preset": "day",
+    "exposure": 0.0,
+    "missingAssets": []
+  },
+  "room": {
+    "width": 3.6,
+    "depth": 4.8,
+    "height": 2.75
+  },
+  "lighting": {
+    "preset": "day",
+    "exposure": -0.75,
+    "sun": {
+      "enabled": true,
+      "strength": 3.2,
+      "color": [
+        1.0,
+        0.9046611743911496,
+        0.7912979403326302
+      ],
+      "angle": 0.6,
+      "azimuth": 15.0,
+      "elevation": 28.0,
+      "position": [
+        6.855709585779502,
+        -25.585856496066086,
+        15.321646883576724
+      ],
+      "direction": [
+        0.22852365285931675,
+        -0.8528618832022029,
+        0.4694715627858908
+      ],
+      "target": [
+        0.0,
+        0.0,
+        1.2375
+      ]
+    },
+    "world": {
+      "kind": "hdri",
+      "hdri": "sky_day",
+      "hdriPath": "/root/.dsh/state/superagent/work/living-room-v3-98f92b76c972/tools/blender-director/assets/sky_day/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "strength": 0.5,
+      "rotation": 200.0,
+      "color": [
+        0.212231,
+        0.391572,
+        0.686685
+      ],
+      "license": {
+        "assetId": "sky_day",
+        "name": "Kloofendal 48d Partly Cloudy (Pure Sky)",
+        "provider": "polyhaven",
+        "sourceUrl": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky",
+        "author": "Poly Haven contributors",
+        "license": "CC0-1.0",
+        "licenseUrl": "https://polyhaven.com/license"
+      }
+    },
+    "windowFill": {
+      "enabled": true,
+      "energy": 260.0,
+      "size": 2.8,
+      "color": [
+        1.0,
+        0.760525,
+        0.552011
+      ],
+      "light": {
+        "name": "ceu-janela",
+        "type": "AREA",
+        "position": [
+          -1.1102230246251565e-16,
+          -2.05,
+          1.2600000000000002
+        ],
+        "energy": 260.0,
+        "size": 2.2,
+        "color": [
+          1.0,
+          0.7605245046752924,
+          0.5520114015120001
+        ],
+        "target": [
+          0.0,
+          0.0,
+          0.9624999999999999
+        ]
+      }
+    },
+    "fixtures": [
+      {
+        "name": "luminaria-teto",
+        "type": "AREA",
+        "position": [
+          0.0,
+          -0.2,
+          2.64
+        ],
+        "energy": 2.7,
+        "sourceWatts": 18.0,
+        "color": [
+          1.0,
+          0.679542,
+          0.391572
+        ]
+      }
+    ]
+  },
+  "camera": {
+    "location": [
+      0.2,
+      1.9,
+      1.15
+    ],
+    "target": [
+      0.0,
+      -0.5,
+      1.15
+    ],
+    "rotation": null,
+    "lens": 24.0,
+    "sensorWidth": 36.0,
+    "fstop": 8.0,
+    "focus": "target",
+    "focusDistance": null,
+    "motionBlur": false
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 128,
+    "resolution": [
+      1280,
+      854
+    ],
+    "device": "CPU",
+    "devices": []
+  },
+  "assets": [
+    {
+      "placementId": "planta-janela",
+      "assetId": "potted_plant_01",
+      "name": "Potted Plant 01",
+      "provider": "polyhaven",
+      "sourceUrl": "https://polyhaven.com/a/potted_plant_01",
+      "author": "Poly Haven contributors",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license"
+    },
+    {
+      "placementId": "quadro-sofa",
+      "assetId": "fancy_picture_frame_01",
+      "name": "Fancy Picture Frame 01",
+      "provider": "polyhaven",
+      "sourceUrl": "https://polyhaven.com/a/fancy_picture_frame_01",
+      "author": "Poly Haven contributors",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license"
+    }
+  ],
+  "stages": [
+    {
+      "stage": "final",
+      "n": 1,
+      "file": "final-001.png",
+      "width": 1280,
+      "height": 854,
+      "samples": 128,
+      "seconds": 59.87,
+      "engine": "CYCLES",
+      "device": "CPU",
+      "renderedAt": "2026-11-04T23:11:00Z"
+    }
+  ],
+  "final": {
+    "stage": "final",
+    "n": 1,
+    "file": "final-001.png",
+    "width": 1280,
+    "height": 854,
+    "samples": 128,
+    "seconds": 59.87,
+    "engine": "CYCLES",
+    "device": "CPU",
+    "renderedAt": "2026-11-04T23:11:00Z"
+  }
+}
