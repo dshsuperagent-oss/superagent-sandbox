@@ -1,151 +1,251 @@
-// As 24 ondas — composição exata da especificação (issue #18).
-// Grupo = { type, count, delay } onde o 1º inimigo nasce em `delay` s depois do
-// início da onda e os demais a cada SPAWN_INTERVALS[type].
+// As 40 ondas da campanha — composição da expansão (issue #20).
+//
+// Estrutura fechada pela issue: 20 fases × 2 ondas; fases 1–7 Deserto,
+// 8–14 Neve, 15–20 Cidade; a 1ª onda de cada fase é a preparação e a 2ª é a
+// onda principal; chefes na 2ª onda das fases 5, 10, 15 e 20 (terrestre,
+// aéreo, terrestre, mecha); inimigos aéreos desde a fase 1, onda 2, em todos
+// os cenários.
+//
+// A composição deriva das 24 ondas da especificação anterior (issue #18),
+// reorganizadas em duas ondas por fase e escaladas ao longo da campanha.
+// Grupo = { type, count, delay }: o 1º inimigo do grupo nasce em `delay`
+// segundos depois do início da onda e os demais a cada SPAWN_INTERVALS[type].
+// A tabela final está documentada no README (seção "Campanha").
 
-const W = (wave, mapId, groups, boss = false) => ({ wave, mapId, groups, boss });
+const W = (phase, waveInPhase, groups, boss = false) => {
+  const scenario = phase <= 7 ? 'deserto' : (phase <= 14 ? 'neve' : 'cidade');
+  return { phase, waveInPhase, scenario, groups, boss };
+};
 
 export const WAVES = [
-  // Deserto (1–8)
-  W(1, 'deserto', [
-    { type: 'soldado', count: 10, delay: 0 },
+  // ---------------------------------------------------------------- Deserto (1–7)
+  W(1, 1, [
+    { type: 'soldado', count: 8, delay: 0 },
   ]),
-  W(2, 'deserto', [
+  W(1, 2, [
     { type: 'soldado', count: 10, delay: 0 },
     { type: 'drone', count: 4, delay: 4 },
   ]),
-  W(3, 'deserto', [
-    { type: 'soldado', count: 8, delay: 0 },
-    { type: 'blindado', count: 3, delay: 2 },
-    { type: 'drone', count: 6, delay: 6 },
-  ]),
-  W(4, 'deserto', [
-    { type: 'drone', count: 8, delay: 0 },
-    { type: 'soldado', count: 6, delay: 2 },
-    { type: 'blindado', count: 4, delay: 4 },
-  ]),
-  W(5, 'deserto', [
+  W(2, 1, [
     { type: 'soldado', count: 10, delay: 0 },
-    { type: 'tanque', count: 2, delay: 0 },
+    { type: 'blindado', count: 2, delay: 3 },
+  ]),
+  W(2, 2, [
+    { type: 'soldado', count: 10, delay: 0 },
+    { type: 'drone', count: 6, delay: 3 },
+    { type: 'blindado', count: 3, delay: 6 },
+  ]),
+  W(3, 1, [
+    { type: 'drone', count: 6, delay: 0 },
+    { type: 'soldado', count: 6, delay: 2 },
+  ]),
+  W(3, 2, [
+    { type: 'drone', count: 8, delay: 0 },
+    { type: 'soldado', count: 8, delay: 2 },
+    { type: 'blindado', count: 4, delay: 5 },
+  ]),
+  W(4, 1, [
+    { type: 'soldado', count: 10, delay: 0 },
+    { type: 'tanque', count: 1, delay: 4 },
+  ]),
+  W(4, 2, [
+    { type: 'soldado', count: 10, delay: 0 },
+    { type: 'tanque', count: 2, delay: 2 },
     { type: 'helicoptero', count: 2, delay: 8 },
   ]),
-  W(6, 'deserto', [
+  W(5, 1, [
     { type: 'drone', count: 10, delay: 0 },
-    { type: 'blindado', count: 6, delay: 2 },
-    { type: 'helicoptero', count: 4, delay: 6 },
+    { type: 'blindado', count: 5, delay: 2 },
   ]),
-  W(7, 'deserto', [
-    { type: 'soldado', count: 10, delay: 0 },
-    { type: 'tanque', count: 3, delay: 2 },
-    { type: 'helicoptero', count: 3, delay: 6 },
-    { type: 'bombardeiro', count: 1, delay: 12 },
-  ]),
-  W(8, 'deserto', [
+  W(5, 2, [
     { type: 'chefe-deserto', count: 1, delay: 0 },
     { type: 'tanque', count: 2, delay: 2 },
     { type: 'drone', count: 8, delay: 4 },
     { type: 'helicoptero', count: 2, delay: 10 },
-  ], true),
+  ], 'chefe-deserto'),
+  W(6, 1, [
+    { type: 'soldado', count: 12, delay: 0 },
+    { type: 'tanque', count: 2, delay: 3 },
+    { type: 'helicoptero', count: 1, delay: 8 },
+  ]),
+  W(6, 2, [
+    { type: 'soldado', count: 12, delay: 0 },
+    { type: 'tanque', count: 3, delay: 2 },
+    { type: 'helicoptero', count: 3, delay: 6 },
+    { type: 'bombardeiro', count: 1, delay: 12 },
+  ]),
+  W(7, 1, [
+    { type: 'drone', count: 12, delay: 0 },
+    { type: 'blindado', count: 6, delay: 2 },
+    { type: 'helicoptero', count: 2, delay: 6 },
+  ]),
+  W(7, 2, [
+    { type: 'drone', count: 12, delay: 0 },
+    { type: 'blindado', count: 8, delay: 2 },
+    { type: 'helicoptero', count: 4, delay: 6 },
+    { type: 'bombardeiro', count: 2, delay: 12 },
+  ]),
 
-  // Neve (9–16)
-  W(9, 'neve', [
+  // ---------------------------------------------------------------- Neve (8–14)
+  W(8, 1, [
+    { type: 'soldado', count: 12, delay: 0 },
+  ]),
+  W(8, 2, [
     { type: 'soldado', count: 12, delay: 0 },
     { type: 'drone', count: 8, delay: 3 },
   ]),
-  W(10, 'neve', [
+  W(9, 1, [
+    { type: 'blindado', count: 6, delay: 0 },
+  ]),
+  W(9, 2, [
     { type: 'blindado', count: 6, delay: 0 },
     { type: 'helicoptero', count: 3, delay: 4 },
   ]),
-  W(11, 'neve', [
+  W(10, 1, [
     { type: 'drone', count: 12, delay: 0 },
-    { type: 'tanque', count: 2, delay: 4 },
+    { type: 'tanque', count: 1, delay: 4 },
   ]),
-  W(12, 'neve', [
+  W(10, 2, [
+    { type: 'chefe-neve', count: 1, delay: 0 },
+    { type: 'zepelim', count: 1, delay: 3 },
+    { type: 'drone', count: 10, delay: 5 },
+    { type: 'helicoptero', count: 3, delay: 8 },
+  ], 'chefe-neve'),
+  W(11, 1, [
+    { type: 'soldado', count: 12, delay: 0 },
+    { type: 'drone', count: 4, delay: 3 },
+  ]),
+  W(11, 2, [
     { type: 'soldado', count: 12, delay: 0 },
     { type: 'helicoptero', count: 5, delay: 3 },
   ]),
-  W(13, 'neve', [
+  W(12, 1, [
+    { type: 'bombardeiro', count: 1, delay: 0 },
+    { type: 'blindado', count: 6, delay: 2 },
+  ]),
+  W(12, 2, [
     { type: 'bombardeiro', count: 2, delay: 0 },
     { type: 'blindado', count: 8, delay: 2 },
   ]),
-  W(14, 'neve', [
+  W(13, 1, [
+    { type: 'tanque', count: 3, delay: 0 },
+    { type: 'helicoptero', count: 2, delay: 4 },
+  ]),
+  W(13, 2, [
     { type: 'zepelim', count: 1, delay: 0 },
     { type: 'drone', count: 12, delay: 2 },
     { type: 'helicoptero', count: 3, delay: 8 },
   ]),
-  W(15, 'neve', [
+  W(14, 1, [
+    { type: 'tanque', count: 4, delay: 0 },
+    { type: 'bombardeiro', count: 1, delay: 4 },
+  ]),
+  W(14, 2, [
     { type: 'tanque', count: 4, delay: 0 },
     { type: 'bombardeiro', count: 2, delay: 4 },
     { type: 'helicoptero', count: 4, delay: 8 },
+    { type: 'zepelim', count: 1, delay: 14 },
   ]),
-  W(16, 'neve', [
-    { type: 'chefe-neve', count: 1, delay: 0 },
-    { type: 'zepelim', count: 2, delay: 3 },
-    { type: 'drone', count: 10, delay: 6 },
-    { type: 'helicoptero', count: 4, delay: 8 },
-  ], true),
 
-  // Cidade (17–24)
-  W(17, 'cidade', [
+  // ---------------------------------------------------------------- Cidade (15–20)
+  W(15, 1, [
     { type: 'soldado', count: 14, delay: 0 },
-    { type: 'drone', count: 10, delay: 3 },
-    { type: 'blindado', count: 4, delay: 6 },
+    { type: 'drone', count: 6, delay: 3 },
   ]),
-  W(18, 'cidade', [
+  W(15, 2, [
+    { type: 'chefe-deserto', count: 1, delay: 0 },
+    { type: 'tanque', count: 2, delay: 2 },
+    { type: 'soldado', count: 10, delay: 4 },
+    { type: 'drone', count: 8, delay: 6 },
+    { type: 'helicoptero', count: 2, delay: 10 },
+  ], 'chefe-deserto'),
+  W(16, 1, [
+    { type: 'helicoptero', count: 4, delay: 0 },
+    { type: 'tanque', count: 2, delay: 4 },
+  ]),
+  W(16, 2, [
     { type: 'helicoptero', count: 6, delay: 0 },
     { type: 'tanque', count: 3, delay: 4 },
+    { type: 'drone', count: 6, delay: 8 },
   ]),
-  W(19, 'cidade', [
+  W(17, 1, [
+    { type: 'bombardeiro', count: 2, delay: 0 },
+    { type: 'drone', count: 10, delay: 3 },
+  ]),
+  W(17, 2, [
     { type: 'bombardeiro', count: 3, delay: 0 },
     { type: 'drone', count: 14, delay: 3 },
   ]),
-  W(20, 'cidade', [
+  W(18, 1, [
+    { type: 'zepelim', count: 1, delay: 0 },
+    { type: 'blindado', count: 8, delay: 2 },
+  ]),
+  W(18, 2, [
     { type: 'zepelim', count: 2, delay: 0 },
     { type: 'blindado', count: 10, delay: 2 },
     { type: 'helicoptero', count: 4, delay: 8 },
   ]),
-  W(21, 'cidade', [
+  W(19, 1, [
     { type: 'tanque', count: 5, delay: 0 },
-    { type: 'bombardeiro', count: 4, delay: 4 },
+    { type: 'bombardeiro', count: 3, delay: 4 },
   ]),
-  W(22, 'cidade', [
-    { type: 'zepelim', count: 3, delay: 0 },
-    { type: 'drone', count: 16, delay: 2 },
-    { type: 'helicoptero', count: 5, delay: 8 },
-  ]),
-  W(23, 'cidade', [
+  W(19, 2, [
     { type: 'tanque', count: 6, delay: 0 },
     { type: 'bombardeiro', count: 4, delay: 3 },
     { type: 'zepelim', count: 2, delay: 6 },
     { type: 'helicoptero', count: 6, delay: 10 },
   ]),
-  W(24, 'cidade', [
+  W(20, 1, [
+    { type: 'tanque', count: 6, delay: 0 },
+    { type: 'bombardeiro', count: 4, delay: 4 },
+    { type: 'drone', count: 10, delay: 8 },
+  ]),
+  W(20, 2, [
     { type: 'chefe-cidade', count: 1, delay: 0 },
     { type: 'zepelim', count: 3, delay: 3 },
     { type: 'helicoptero', count: 6, delay: 6 },
     { type: 'tanque', count: 4, delay: 8 },
     { type: 'drone', count: 12, delay: 10 },
-  ], true),
+  ], 'chefe-cidade'),
 ];
 
-export function waveFor(mapId, localWave) {
-  const idx = ['deserto', 'neve', 'cidade'].indexOf(mapId);
-  if (idx < 0 || localWave < 1 || localWave > 8) return null;
-  return WAVES[idx * 8 + localWave - 1];
+/** Onda de uma fase (1..20) e onda local (1..2); null se inválida. */
+export function waveFor(phase, waveInPhase) {
+  const p = Math.round(Number(phase));
+  const w = Math.round(Number(waveInPhase));
+  if (!Number.isFinite(p) || !Number.isFinite(w)) return null;
+  return WAVES.find((onda) => onda.phase === p && onda.waveInPhase === w) || null;
 }
 
-export function wavesForMap(mapId) {
-  return WAVES.filter((w) => w.mapId === mapId);
+/** As 2 ondas de uma fase, na ordem. */
+export function wavesForPhase(phase) {
+  return WAVES.filter((onda) => onda.phase === Math.round(Number(phase)));
 }
 
-export function totalEnemies(wave) {
-  return wave.groups.reduce((sum, g) => sum + g.count, 0);
+/** Número da onda global (1..40) de uma onda local de uma fase. */
+export function globalWaveOf(onda) {
+  if (!onda) return 0;
+  return (onda.phase - 1) * 2 + onda.waveInPhase;
 }
 
-export function airEnemiesIn(wave) {
-  return wave.groups.filter((g) => g.type === 'drone' || g.type === 'helicoptero'
-    || g.type === 'bombardeiro' || g.type === 'zepelim' || g.type === 'chefe-neve');
+/** Total de inimigos de uma onda. */
+export function totalEnemies(onda) {
+  if (!onda || !Array.isArray(onda.groups)) return 0;
+  return onda.groups.reduce((soma, grupo) => soma + grupo.count, 0);
 }
 
-export function groundEnemiesIn(wave) {
-  return totalEnemies(wave) - airEnemiesIn(wave).reduce((sum, g) => sum + g.count, 0);
+/** Grupos aéreos de uma onda (mesma semântica da versão anterior). */
+export function airEnemiesIn(onda) {
+  if (!onda || !Array.isArray(onda.groups)) return [];
+  return onda.groups.filter((grupo) => grupo.type === 'drone'
+    || grupo.type === 'helicoptero'
+    || grupo.type === 'bombardeiro'
+    || grupo.type === 'zepelim'
+    || grupo.type === 'chefe-neve');
+}
+
+/** Total de inimigos terrestres de uma onda. */
+export function groundEnemiesIn(onda) {
+  const aereos = airEnemiesIn(onda).reduce((soma, grupo) => soma + grupo.count, 0);
+  return totalEnemies(onda) - aereos;
 }

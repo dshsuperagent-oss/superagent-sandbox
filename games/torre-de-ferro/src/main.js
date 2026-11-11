@@ -4,8 +4,11 @@
 // eventos e o snapshot serializável do estado.
 
 import {
-  STEP, START_MONEY, START_MONEY_PER_MAP, START_LIVES, SAVE_KEY, MAP_ORDER, MAP_NAMES,
-  starsForLives, applyVictory, validateSave, createDefaultSave, TOWERS, ENEMIES, TROOP_ORDER,
+  STEP, SAVE_KEY, LEGACY_SAVE_KEY, MAP_ORDER, MAP_NAMES,
+  TOTAL_PHASES, WAVES_PER_PHASE, PHASES_PER_SCENARIO,
+  starsForLives, applyPhaseVictory, validateSave, createDefaultSave,
+  isPhaseUnlocked, completedPhaseCount, scenarioForPhase,
+  TOWERS, ENEMIES, TROOP_ORDER,
 } from './sim/data.js';
 import { DEFAULT_SEED } from './sim/rng.js';
 import { getMap } from './sim/maps.js';
@@ -34,6 +37,9 @@ const MENSAGENS_ERRO = {
 
 function mensagemErro(res) {
   if (!res) return 'Ação indisponível.';
+  if (res.error === 'bloqueado' && res.unlockPhase) {
+    return `Desbloqueia na fase ${res.unlockPhase}.`;
+  }
   return MENSAGENS_ERRO[res.error] || 'Ação indisponível.';
 }
 
@@ -55,14 +61,10 @@ function chamarFx(metodo, ...args) {
   return null;
 }
 
-function lerSave() {
-  try {
-    const bruto = window.localStorage.getItem(SAVE_KEY);
-    if (!bruto) return createDefaultSave();
-    return validateSave(bruto);
-  } catch (err) {
-    return createDefaultSave();
-  }
+function normalizarFase(valor) {
+  const n = Math.round(Number(valor));
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(TOTAL_PHASES, Math.max(1, n));
 }
 
 function gravarSave(save) {
@@ -71,6 +73,24 @@ function gravarSave(save) {
     return true;
   } catch (err) {
     return false;
+  }
+}
+
+// Save v2: lê a chave nova; se só existir a v1, migra com validateSave e grava
+// a v2 imediatamente (a v1 fica intacta como backup).
+function lerSave() {
+  try {
+    const brutoV2 = window.localStorage.getItem(SAVE_KEY);
+    if (brutoV2) return validateSave(brutoV2);
+    const brutoV1 = window.localStorage.getItem(LEGACY_SAVE_KEY);
+    if (brutoV1) {
+      const migrado = validateSave(brutoV1);
+      gravarSave(migrado);
+      return migrado;
+    }
+    return createDefaultSave();
+  } catch (err) {
+    return createDefaultSave();
   }
 }
 
@@ -83,6 +103,7 @@ function el(id) {
 const app = {
   save: lerSave(),
   engine: null,
+  phaseNumber: 1,
   mapId: null,
   scene: null,
   hud: null,
@@ -142,45 +163,55 @@ function abrirMissoes() {
   mostrarTela('maps');
 }
 
-function selecionarMapa(mapId) {
-  const mapa = getMap(mapId);
-  if (!mapa) return;
-  const dados = app.save.maps[mapId];
-  if (!dados || !dados.unlocked) {
-    app.hud.toast('Bloqueado (complete o mapa anterior)');
+// Fase inicial da campanha: primeira fase liberada ainda não concluída.
+function primeiraFaseDisponivel() {
+  for (let fase = 1; fase <= TOTAL_PHASES; fase += 1) {
+    const info = app.save.phases && app.save.phases[fase - 1];
+    if (isPhaseUnlocked(app.save, fase) && !(info && info.completed)) return fase;
+  }
+  for (let fase = 1; fase <= TOTAL_PHASES; fase += 1) {
+    if (isPhaseUnlocked(app.save, fase)) return fase;
+  }
+  return 1;
+}
+
+// Compatibilidade: __TD__.start({mapId}) de versões antigas aponta para a 1ª fase do cenário.
+const PRIMEIRA_FASE_DO_CENARIO = { deserto: 1, neve: 1 + PHASES_PER_SCENARIO.deserto, cidade: 1 + PHASES_PER_SCENARIO.deserto + PHASES_PER_SCENARIO.neve };
+
+function faseDeOpcoes(opcoes) {
+  const o = opcoes && typeof opcoes === 'object' ? opcoes : {};
+  if (Number.isFinite(Number(o.phase))) return normalizarFase(o.phase);
+  if (o.mapId && Number.isFinite(PRIMEIRA_FASE_DO_CENARIO[o.mapId])) return normalizarFase(PRIMEIRA_FASE_DO_CENARIO[o.mapId]);
+  if (Number.isFinite(Number(app.phaseNumber))) return normalizarFase(app.phaseNumber);
+  return 1;
+}
+
+function selecionarFase(fase) {
+  const alvo = normalizarFase(fase);
+  if (!isPhaseUnlocked(app.save, alvo)) {
+    app.hud.toast('Fase bloqueada: complete a fase anterior.');
     chamarAudio('handle', [{ type: 'error' }], null);
     return;
   }
-  iniciarPartida(mapId);
-}
-
-function primeiroMapaDisponivel() {
-  for (const id of MAP_ORDER) {
-    const dados = app.save.maps[id];
-    if (dados && dados.unlocked && dados.stars === 0) return id;
-  }
-  for (const id of MAP_ORDER) {
-    if (app.save.maps[id] && app.save.maps[id].unlocked) return id;
-  }
-  return 'deserto';
+  iniciarPartida(alvo);
 }
 
 function iniciarCampanha() {
-  iniciarPartida(primeiroMapaDisponivel());
+  iniciarPartida(primeiraFaseDisponivel());
 }
 
 function proximaMissao() {
-  if (!app.mapId) { abrirMissoes(); return; }
-  const idx = MAP_ORDER.indexOf(app.mapId);
-  const proximo = MAP_ORDER[idx + 1];
-  if (proximo && app.save.maps[proximo] && app.save.maps[proximo].unlocked) {
-    iniciarPartida(proximo);
-  } else if (proximo) {
+  if (!app.phaseNumber) { abrirMissoes(); return; }
+  if (app.phaseNumber >= TOTAL_PHASES) {
     abrirMissoes();
+    return;
+  }
+  const proxima = app.phaseNumber + 1;
+  if (isPhaseUnlocked(app.save, proxima)) {
+    iniciarPartida(proxima);
   } else {
-    app.hud.updateMaps(app.save);
-    mostrarTela('maps');
-    app.hud.toast('Você defendeu todos os setores!');
+    abrirMissoes();
+    app.hud.toast('Complete a fase atual para liberar a próxima.');
   }
 }
 
@@ -194,11 +225,22 @@ function missoesVitoria() {
 
 // ------------------------------------------------------------------ partida
 
-function iniciarPartida(mapId, opcoes = {}) {
-  const mapa = getMap(mapId) || getMap('deserto');
-  if (!mapa) return;
+function iniciarPartida(fase, opcoes = {}) {
+  const numeroFase = Number.isFinite(Number(fase)) ? normalizarFase(fase) : faseDeOpcoes(opcoes);
+  const opcoesMotor = {
+    phase: numeroFase,
+    seed: Number.isFinite(opcoes.seed) ? opcoes.seed : DEFAULT_SEED,
+    bonusPermanent: Number.isFinite(opcoes.bonusPermanent)
+      ? Number(opcoes.bonusPermanent)
+      : (Number(app.save.bonusPermanent) || 0),
+    completedPhases: Number.isFinite(opcoes.completedPhases)
+      ? Number(opcoes.completedPhases)
+      : completedPhaseCount(app.save),
+  };
+  if (Number.isFinite(opcoes.money)) opcoesMotor.money = Number(opcoes.money);
+  if (Number.isFinite(opcoes.lives)) opcoesMotor.lives = Number(opcoes.lives);
 
-  app.mapId = mapa.id;
+  app.phaseNumber = numeroFase;
   app.matchActive = true;
   app.ended = false;
   app.paused = false;
@@ -210,22 +252,17 @@ function iniciarPartida(mapId, opcoes = {}) {
   ui.selectedTowerId = null;
   ui.deployTipo = null;
 
-  app.engine = createEngine({
-    mapId: mapa.id,
-    seed: Number.isFinite(opcoes.seed) ? opcoes.seed : DEFAULT_SEED,
-    money: Number.isFinite(opcoes.money)
-      ? opcoes.money
-      : (START_MONEY_PER_MAP[mapa.id] ?? START_MONEY),
-    lives: Number.isFinite(opcoes.lives) ? opcoes.lives : START_LIVES,
-  });
+  app.engine = createEngine(opcoesMotor);
+  const estadoInicial = app.engine.getState();
+  app.mapId = estadoInicial.scenario || scenarioForPhase(numeroFase);
 
   app.scene.setMap(app.engine.getMapDef());
   app.scene.highlightSlot(null);
   app.scene.highlightPoint(null);
   app.hud.setBossBar(null);
 
-  // Tutorial: apenas no Deserto e enquanto não foi concluído.
-  if (mapa.id === 'deserto' && !app.save.tutorialDone) {
+  // Tutorial: apenas na fase 1 e enquanto não foi concluído.
+  if (numeroFase === 1 && !app.save.tutorialDone) {
     ui.tutorialStep = 1;
   } else {
     ui.tutorialStep = null;
@@ -261,8 +298,13 @@ function sairPartida() {
 }
 
 function tentarDeNovo() {
-  if (app.mapId) iniciarPartida(app.mapId);
+  if (app.phaseNumber) iniciarPartida(app.phaseNumber);
   else irParaMenu();
+}
+
+function cenarioDaFase(fase) {
+  const cenario = scenarioForPhase(fase) || app.mapId || 'deserto';
+  return MAP_NAMES[cenario] || cenario;
 }
 
 function finalizarPartida(estado) {
@@ -272,12 +314,14 @@ function finalizarPartida(estado) {
   app.hud.setTutorial(null);
 
   const vitoria = estado.phase === 'victory';
+  const fase = normalizarFase(estado.phaseNumber || app.phaseNumber || 1);
   let save = app.save;
   if (vitoria) {
-    save = applyVictory(save, app.mapId, estado.lives);
+    save = applyPhaseVictory(save, fase, estado.lives);
   }
-  save.totals.kills += Math.max(0, estado.stats ? estado.stats.kills : 0);
-  save.totals.timePlayed += Math.max(0, Math.round(app.matchTime));
+  if (!save.totals || typeof save.totals !== 'object') save.totals = { kills: 0, waves: 0, timePlayed: 0 };
+  save.totals.kills = Math.max(0, Math.round(Number(save.totals.kills) || 0)) + Math.max(0, estado.stats ? estado.stats.kills : 0);
+  save.totals.timePlayed = Math.max(0, Math.round(Number(save.totals.timePlayed) || 0)) + Math.max(0, Math.round(app.matchTime));
   // Mantém a preferência de velocidade da partida no save.
   save.settings.speed = app.speed;
   app.save = save;
@@ -286,20 +330,34 @@ function finalizarPartida(estado) {
   chamarAudio('stopMusic');
   app.hud.setBossBar(null);
 
+  const cenario = estado.scenarioName || cenarioDaFase(fase);
+  const faseLabel = `Fase ${fase}/${TOTAL_PHASES} · ${cenario}`;
+
   if (vitoria) {
     const estrelas = starsForLives(estado.lives);
-    app.hud.showScreen('victory', {
-      lives: estado.lives,
-      stars: estrelas,
-      mapId: app.mapId,
-      mapName: MAP_NAMES[app.mapId] || app.mapId,
-      hasNext: MAP_ORDER.indexOf(app.mapId) < MAP_ORDER.length - 1,
-    });
-    ui.screen = 'victory';
+    const campanhaConcluida = fase >= TOTAL_PHASES;
+    if (campanhaConcluida) {
+      // Fase 20 vencida: tela de campanha concluída (SCREENS do hud.js).
+      app.hud.showScreen('campanha', { save: app.save });
+      ui.screen = 'campanha';
+    } else {
+      app.hud.showScreen('victory', {
+        lives: estado.lives,
+        stars: estrelas,
+        phaseNumber: fase,
+        totalPhases: TOTAL_PHASES,
+        scenarioName: cenario,
+        faseLabel,
+        hasNext: fase < TOTAL_PHASES,
+      });
+      ui.screen = 'victory';
+    }
   } else {
     app.hud.showScreen('defeat', {
-      mapId: app.mapId,
-      mapName: MAP_NAMES[app.mapId] || app.mapId,
+      phaseNumber: fase,
+      totalPhases: TOTAL_PHASES,
+      scenarioName: cenario,
+      faseLabel,
       wave: estado.wave,
       lives: estado.lives,
     });
@@ -509,7 +567,8 @@ function processarEventos(eventos) {
   for (const ev of eventos) {
     if (!ev || !ev.type) continue;
     if (ev.type === 'waveStart') {
-      app.hud.toast(`Onda ${((ev.wave - 1) % 8) + 1} iniciada.`);
+      const ondaLocal = ((Math.max(1, Math.round(Number(ev.wave) || 1)) - 1) % WAVES_PER_PHASE) + 1;
+      app.hud.toast(`Fase ${app.phaseNumber}/${TOTAL_PHASES} · Onda ${ondaLocal}/${WAVES_PER_PHASE} iniciada.`);
     } else if (ev.type === 'waveEnd') {
       app.hud.toast(`Onda concluída! Bônus de $${ev.bonus}.`);
     } else if (ev.type === 'bossSpawn') {
@@ -615,6 +674,7 @@ function aoTeclar(ev) {
     if (ui.screen === 'help') { fecharAjuda(); ev.preventDefault(); return; }
     if (ui.screen === 'controls') { fecharControles(); ev.preventDefault(); return; }
     if (ui.screen === 'pause') { retomar(); ev.preventDefault(); return; }
+    if (ui.screen === 'campanha') { irParaMenu(); ev.preventDefault(); return; }
     if (ui.screen === 'game') {
       if (ui.panel) fecharPainel();
       else pausar();
@@ -654,7 +714,7 @@ function criarHandlers() {
   return {
     iniciarCampanha,
     abrirMissoes,
-    selecionarMapa,
+    selecionarFase,
     voltarMenu: irParaMenu,
     iniciarOnda,
     pausar,
@@ -683,16 +743,30 @@ function criarHandlers() {
 
 function instalarTD() {
   const TD = {
-    // Contrato de QA exigido pela issue #18 / DESIGN §15.2 (campos + métodos).
-    version: '1.0.0',
+    // Contrato de QA da expansão (issue #20 / CONTRATO-EXPANSAO.md).
+    version: '2.0.0',
     ready: false,
+    phases: TOTAL_PHASES,
+    scenarios: MAP_ORDER.slice(),
     maps: MAP_ORDER.slice(),
     enemyTypes: Object.keys(ENEMIES),
     towerTypes: Object.keys(TOWERS),
     troopTypes: TROOP_ORDER.slice(),
     start(opcoes) {
-      iniciarPartida((opcoes && opcoes.mapId) || 'deserto', opcoes || {});
+      const o = opcoes && typeof opcoes === 'object' ? opcoes : {};
+      iniciarPartida(faseDeOpcoes(o), o);
       return true;
+    },
+    startPhase(fase) {
+      iniciarPartida(normalizarFase(fase));
+      return true;
+    },
+    save() {
+      try {
+        return JSON.parse(JSON.stringify(app.save));
+      } catch (err) {
+        return null;
+      }
     },
     state() {
       return app.engine ? app.engine.getState() : null;
@@ -788,6 +862,8 @@ function instalarTD() {
         lives: estado ? estado.lives : null,
         wave: estado ? estado.wave : null,
         phase: estado ? estado.phase : null,
+        phaseNumber: estado ? estado.phaseNumber : null,
+        globalWave: estado ? estado.globalWave : null,
       };
     },
     zoomBy(fator) {

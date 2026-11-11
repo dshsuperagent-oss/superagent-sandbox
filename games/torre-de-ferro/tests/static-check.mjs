@@ -6,7 +6,7 @@
 
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
 
@@ -143,13 +143,14 @@ const REQUIRED_FILES = [
   'tests/browser-check.mjs',
 ];
 
-// Contrato de QA (window.__TD__): 20 métodos + 6 campos de metadados.
+// Contrato de QA (window.__TD__ v2 da expansão): 25 métodos + 7 campos de metadados.
 const TD_METHODS = [
-  'start', 'state', 'eventLog', 'spawnWave', 'spawnEnemy', 'giveMoney', 'setLives',
-  'setSpeed', 'pause', 'resume', 'fastForward', 'buildTower', 'upgradeTower',
-  'sellTower', 'deployTroop', 'audioLog', 'fxLog', 'perf', 'win', 'lose',
+  'start', 'startPhase', 'save', 'state', 'eventLog', 'spawnWave', 'spawnEnemy',
+  'giveMoney', 'setLives', 'setSpeed', 'pause', 'resume', 'fastForward',
+  'buildTower', 'upgradeTower', 'sellTower', 'deployTroop', 'audioLog', 'fxLog',
+  'perf', 'zoomBy', 'view', 'projectSlot', 'win', 'lose',
 ];
-const TD_FIELDS = ['version', 'ready', 'maps', 'enemyTypes', 'towerTypes', 'troopTypes'];
+const TD_FIELDS = ['version', 'ready', 'phases', 'scenarios', 'enemyTypes', 'towerTypes', 'troopTypes'];
 
 function checkRequiredFiles() {
   const missing = REQUIRED_FILES.filter((rel) => !existsSync(join(GAME_DIR, rel)));
@@ -313,6 +314,113 @@ function checkNoMathRandomInSim() {
   return `${files.length} arquivos de src/sim sem Math.random()`;
 }
 
+/** Contrato da expansão (data.js/waves.js) — valores e funções exigidos pela issue #20. */
+async function checkDataContract() {
+  const data = await import(pathToFileURL(join(GAME_DIR, 'src/sim/data.js')).href);
+  const waves = await import(pathToFileURL(join(GAME_DIR, 'src/sim/waves.js')).href);
+  const eqv = (obtido, esperado, nome) => must(obtido === esperado,
+    `${nome}: esperado ${JSON.stringify(esperado)}, obtido ${JSON.stringify(obtido)}`);
+  eqv(data.TOTAL_PHASES, 20, 'TOTAL_PHASES');
+  eqv(data.WAVES_PER_PHASE, 2, 'WAVES_PER_PHASE');
+  eqv(data.TOTAL_WAVES, 40, 'TOTAL_WAVES');
+  eqv(data.START_LIVES, 20, 'START_LIVES');
+  eqv(data.PHASES_PER_SCENARIO.deserto, 7, 'PHASES_PER_SCENARIO.deserto');
+  eqv(data.PHASES_PER_SCENARIO.neve, 7, 'PHASES_PER_SCENARIO.neve');
+  eqv(data.PHASES_PER_SCENARIO.cidade, 6, 'PHASES_PER_SCENARIO.cidade');
+  eqv(data.SAVE_KEY, 'td3d:save:v2', 'SAVE_KEY');
+  eqv(data.LEGACY_SAVE_KEY, 'td3d:save:v1', 'LEGACY_SAVE_KEY');
+  eqv(data.SAVE_VERSION, 2, 'SAVE_VERSION');
+  for (const nome of ['scenarioForPhase', 'phasesForScenario', 'globalWaveFor', 'bonusPermanentFor',
+    'startingMoneyFor', 'rewardMultiplier', 'rewardFor', 'hpForWave', 'bossForPhase',
+    'towerUnlocked', 'troopUnlocked', 'upgradeUnlocked', 'createDefaultSave', 'validateSave',
+    'applyPhaseVictory', 'isPhaseUnlocked', 'completedPhaseCount', 'starsForLives', 'waveBonus']) {
+    must(typeof data[nome] === 'function', `data.js não exporta a função ${nome}`);
+  }
+  for (const nome of ['TOWER_UNLOCK_PHASE', 'TROOP_UNLOCK_PHASE', 'UPGRADE_UNLOCK_PHASE', 'BOSS_PHASES']) {
+    must(data[nome] && typeof data[nome] === 'object', `data.js não exporta ${nome}`);
+  }
+  eqv(data.BOSS_PHASES[5], 'chefe-deserto', 'chefe da fase 5');
+  eqv(data.BOSS_PHASES[10], 'chefe-neve', 'chefe da fase 10');
+  eqv(data.BOSS_PHASES[15], 'chefe-deserto', 'chefe da fase 15');
+  eqv(data.BOSS_PHASES[20], 'chefe-cidade', 'chefe da fase 20');
+
+  // Save v2 padrão.
+  const save = data.createDefaultSave();
+  eqv(save.version, 2, 'save.version');
+  eqv(save.bonusPermanent, 0, 'save.bonusPermanent');
+  eqv(Array.isArray(save.phases) && save.phases.length, 20, 'save.phases.length');
+  must(save.phases.every((fase) => fase.completed === false && fase.stars === 0 && fase.bestLives === 0),
+    'save.phases padrão deveria ser 20 fases não concluídas');
+
+  // 40 ondas: distribuição por cenário, chefes e aéreos na 2ª onda.
+  must(Array.isArray(waves.WAVES) && waves.WAVES.length === 40, 'waves.js deveria exportar 40 ondas');
+  for (const nome of ['waveFor', 'wavesForPhase', 'totalEnemies', 'airEnemiesIn', 'groundEnemiesIn']) {
+    must(typeof waves[nome] === 'function', `waves.js não exporta a função ${nome}`);
+  }
+  const porCenario = { deserto: 0, neve: 0, cidade: 0 };
+  for (const onda of waves.WAVES) {
+    must(onda.groups && Array.isArray(onda.groups), `onda ${onda.phase}/${onda.waveInPhase}: groups`);
+    porCenario[onda.scenario] += 1;
+    if (onda.waveInPhase === 2) {
+      must(waves.airEnemiesIn(onda).length > 0, `onda ${onda.phase}/2 deveria ter aéreos`);
+    }
+  }
+  eqv(porCenario.deserto, 14, 'ondas do Deserto (7 fases × 2)');
+  eqv(porCenario.neve, 14, 'ondas da Neve (7 fases × 2)');
+  eqv(porCenario.cidade, 12, 'ondas da Cidade (6 fases × 2)');
+  for (const [fase, tipo] of [[5, 'chefe-deserto'], [10, 'chefe-neve'], [15, 'chefe-deserto'], [20, 'chefe-cidade']]) {
+    const onda = waves.waveFor(fase, 2);
+    must(onda && onda.boss === tipo, `fase ${fase} onda 2: chefe ${tipo}`);
+  }
+  return 'TOTAL_PHASES=20, 40 ondas (14/14/12), chefes 5/10/15/20, save v2 (td3d:save:v2)';
+}
+
+function checkNoLocalStorageInSim() {
+  const files = walkFiles(join(GAME_DIR, 'src/sim'), { skipDirs: [] }).filter((f) => /\.js$/.test(f));
+  const offenders = [];
+  for (const file of files) {
+    const linhas = readText(file).split('\n');
+    linhas.forEach((linha, i) => {
+      if (/^\s*\/\//.test(linha)) return;
+      if (/localStorage|sessionStorage|window\.|document\./.test(linha)) {
+        offenders.push(`${relToGame(file)}:${i + 1}`);
+      }
+    });
+  }
+  must(offenders.length === 0, `src/sim deveria ser puro (sem DOM/storage): ${offenders.join(', ')}`);
+  return `${files.length} arquivos de src/sim puros (sem DOM/localStorage)`;
+}
+
+function checkHudSemEngine() {
+  const hud = readText(join(GAME_DIR, 'src/render/hud.js'));
+  const codigo = hud.split('\n').filter((linha) => !/^\s*\/\//.test(linha)).join('\n');
+  must(!/localStorage|sessionStorage/.test(codigo), 'hud.js não pode conhecer localStorage (contrato)');
+  must(!/from\s+['"][^'"]*\/sim\/engine\.js['"]/.test(codigo),
+    'hud.js não pode importar o engine (contrato: recebe estado/save via main.js)');
+  return 'hud.js só recebe estado/save via main.js (constantes de data.js são permitidas)';
+}
+
+function checkSaveV2NoMain() {
+  const main = readText(join(GAME_DIR, 'src/main.js'));
+  must(/SAVE_KEY/.test(main) && /LEGACY_SAVE_KEY/.test(main), 'main.js deve usar SAVE_KEY e LEGACY_SAVE_KEY');
+  must(/validateSave\s*\(/.test(main), 'main.js deve chamar validateSave (migração/sanitização)');
+  must(/applyPhaseVictory\s*\(/.test(main), 'main.js deve chamar applyPhaseVictory ao vencer a fase');
+  must(/localStorage\.setItem\s*\(\s*SAVE_KEY/.test(main), 'main.js deve gravar no save v2 (SAVE_KEY)');
+  return 'main.js lê/migra/grava o save v2 via SAVE_KEY/LEGACY_SAVE_KEY';
+}
+
+function checkUiCampanha() {
+  const html = readText(join(GAME_DIR, 'index.html'));
+  for (const id of ['map-list', 'hud-onda', 'hud-mapa', 'screen-campanha']) {
+    must(new RegExp(`id=["']${id}["']`).test(html), `index.html sem #${id}`);
+  }
+  must(/Fase\s+\d+\/\d+\s*·\s*Onda\s+\d+\/\d+/.test(html), 'index.html sem o texto "Fase n/N · Onda m/M" na HUD');
+  const hud = readText(join(GAME_DIR, 'src/render/hud.js'));
+  must(/fase-card/.test(hud), 'hud.js deve gerar os cartões .fase-card das 20 fases');
+  must(/data-fase/.test(hud), 'hud.js deve marcar data-fase nos cartões');
+  return 'seleção de 20 fases (#map-list/.fase-card), HUD "Fase n/20 · Onda m/2" e #screen-campanha';
+}
+
 function checkHtmlPtBr() {
   const html = readText(join(GAME_DIR, 'index.html'));
   must(/<html\b[^>]*\blang\s*=\s*["']pt-BR["']/i.test(html), 'faltou <html lang="pt-BR">');
@@ -452,6 +560,8 @@ function checkWindowTd() {
     onde = 'objeto literal';
   }
   must(objText, `não foi possível ler a definição de window.__TD__ (${onde}) em src/main.js`);
+  must(/version\s*:\s*['"]2\.0\.0['"]/.test(code), 'window.__TD__.version deve ser "2.0.0"');
+  must(/phases\s*:\s*TOTAL_PHASES|phases\s*:\s*20/.test(code), 'window.__TD__.phases deve ser 20 (TOTAL_PHASES)');
   const missing = required.filter((name) => !objText.has(name));
   must(missing.length === 0,
     `window.__TD__ (${onde}) em src/main.js não define: ${missing.join(', ')}`);
@@ -584,9 +694,14 @@ async function main() {
   check('node --check em todos os .js/.mjs do jogo', checkNodeSyntax);
   check('sem node_modules no repo/jogo', checkNoNodeModules);
   check('sem Math.random() em src/sim', checkNoMathRandomInSim);
+  check('src/sim puro (sem DOM/localStorage)', checkNoLocalStorageInSim);
+  check('hud.js sem engine/localStorage (recebe estado/save)', checkHudSemEngine);
   check('index.html lang="pt-BR"', checkHtmlPtBr);
   check('UI pt-BR (texto visível do index.html)', checkUiPortuguese);
+  check('save v2: main.js lê/migra/grava via SAVE_KEY/LEGACY_SAVE_KEY', checkSaveV2NoMain);
+  check('UI da campanha: 20 fases, HUD Fase n/20 · Onda m/2, tela de campanha', checkUiCampanha);
   check('window.__TD__ completo em src/main.js', checkWindowTd);
+  await checkAsync('contrato de data.js/waves.js (20 fases, 40 ondas, save v2)', checkDataContract);
   await checkAsync('serve.mjs: HTTP 200/404, MIME, no-store, traversal', checkServe);
   check('nenhum arquivo alterado fora do escopo (git status --porcelain)', checkGitScope);
 
