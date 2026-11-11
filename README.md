@@ -279,3 +279,5 @@ arquitetura recomendada para um editor web sem build step.
 - [`docs/pesquisa-cripto-perdida.md`](docs/pesquisa-cripto-perdida.md) — relatório técnico e jurídico sobre criptomoedas "perdidas sem dono": por que chaves perdidas são irrecuperáveis, o que cada categoria permite e por que se apropriar de cripto de terceiros pode ser crime no Brasil.
 
 O monitor não reivindica nem move fundos: ele apenas observa dados públicos. A conclusão do relatório é explícita — não existe caminho legítimo para "achar" criptomoeda de terceiros e ficar com ela.
+
+- **[Taichi na Cadeira](taichi-na-cadeira/README.md)** — programa ilustrado de 8 semanas (24 sessões) em site único e offline: 8 movimentos em SVG, guia do mentor, segurança e adaptação para escritório.
