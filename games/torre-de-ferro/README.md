@@ -249,8 +249,9 @@ node tests/mobile-check.mjs         # exit 0 (com Playwright) — emula iPhone (
 ```
 
 Resultados medidos neste ambiente: `simulate` **40/40**, `--completo` **43/43**,
-`browser-check` **26/26**, `mobile-check` **38/38** (iPhone + iPad). A URL pública do
-GitHub Pages também foi validada (iPhone/iPad, manifest, service worker e offline): **20/20**.
+`browser-check` **26/26**, `mobile-check` **60/60** (iPhone retrato, iPad e iPhone paisagem).
+A URL pública do GitHub Pages também foi validada (iPhone/iPad/paisagem, manifest, service worker
+e offline): **33/33**.
 Sem Playwright, `mobile-check` imprime `SKIP` e sai com 0 (como o `browser-check`).
 
 `static-check.mjs` sobe o `serve.mjs` de verdade numa porta livre e confere `200` em
