@@ -1,0 +1,19 @@
+{
+  "name": "Torre de Ferro — Defesa do Último Posto",
+  "short_name": "Torre de Ferro",
+  "description": "Jogo 3D de defesa de torre em português: 24 ondas, 3 mapas, inimigos aéreos, 6 torres e 3 tropas especiais.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0c11",
+  "theme_color": "#0a0c11",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0a0c11" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Torre de Ferro" />
+  <title>Torre de Ferro — Defesa do Último Posto</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="cena" aria-label="Campo de batalha 3D"></canvas>
+
+    <!-- ================= MENU ================= -->
+    <div id="screen-menu" class="screen screen--menu active" data-screen="menu">
+      <div class="menu-painel">
+        <div class="menu-selo" aria-hidden="true">✦</div>
+        <h1 id="menu-titulo">Torre de Ferro</h1>
+        <p class="menu-subtitulo">Defesa do Último Posto</p>
+        <p class="menu-chamada">Segure as últimas linhas do último posto. 3 setores, 24 ondas, zero reforços.</p>
+        <div class="menu-botoes">
+          <button id="btn-iniciar" class="botao botao--forte" type="button">Iniciar Campanha</button>
+          <button id="btn-missoes" class="botao" type="button">Selecionar Missão</button>
+          <button id="btn-controles" class="botao botao--fraco" type="button">Controles</button>
+        </div>
+        <p class="menu-rodape">3 cenários · 24 ondas · 6 torres · 3 tropas especiais</p>
+      </div>
+    </div>
+
+    <!-- ================= SELEÇÃO DE MISSÃO ================= -->
+    <div id="screen-maps" class="screen screen--overlay" data-screen="maps">
+      <div class="painel painel--missao">
+        <h2>Selecionar Missão</h2>
+        <p class="painel-dica">Complete um setor para liberar o próximo. Estrelas medem as vidas que restaram.</p>
+        <div id="map-list" class="map-list"><!-- cards gerados por hud.js --></div>
+        <div class="painel-acoes">
+          <button id="btn-voltar-menu" class="botao botao--fraco" type="button">Voltar ao menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= PARTIDA ================= -->
+    <div id="screen-game" class="screen screen--hud" data-screen="game" hidden>
+      <div id="hud-top" class="hud-topo">
+        <div class="hud-recurso" title="Caixa">
+          <span class="hud-icone hud-icone--dinheiro">$</span>
+          <span id="hud-dinheiro" class="hud-valor">350</span>
+        </div>
+        <div class="hud-recurso" title="Vidas">
+          <span class="hud-icone hud-icone--vida">♥</span>
+          <span id="hud-vidas" class="hud-valor">20</span>
+        </div>
+        <div class="hud-recurso hud-recurso--onda" title="Onda">
+          <span id="hud-onda" class="hud-valor">Onda 1/8</span>
+        </div>
+        <div class="hud-recurso hud-recurso--mapa" title="Setor">
+          <span id="hud-mapa" class="hud-valor">Deserto</span>
+        </div>
+        <div class="hud-botoes">
+          <button id="btn-onda" class="botao botao--onda" type="button">Iniciar Onda</button>
+          <button id="btn-tropas" class="botao botao--hud" type="button">Tropas</button>
+          <button id="btn-zoom-menos" class="botao botao--hud so-toque" type="button" aria-label="Afastar câmera" title="Afastar">−</button>
+          <button id="btn-zoom-mais" class="botao botao--hud so-toque" type="button" aria-label="Aproximar câmera" title="Aproximar">+</button>
+          <button id="btn-velocidade" class="botao botao--hud" type="button" title="Alternar velocidade (F)">1x</button>
+          <button id="btn-pausa" class="botao botao--hud" type="button" title="Pausar (Espaço)">Pausar</button>
+          <button id="btn-mudo" class="botao botao--hud" type="button" title="Som (M)">Som</button>
+          <button id="btn-ajuda" class="botao botao--hud" type="button" title="Ajuda (H)">Ajuda</button>
+        </div>
+      </div>
+
+      <div id="chefe-barra" class="chefe-barra" hidden>
+        <div class="chefe-titulo"><span id="chefe-nome">Chefe</span> <span id="chefe-vida-texto" class="chefe-vida-texto"></span></div>
+        <div class="chefe-trilho"><div id="chefe-vida" class="chefe-vida"></div></div>
+      </div>
+
+      <div id="alerta-chefe" class="alerta-chefe" hidden>
+        <strong>Alerta de chefe!</strong>
+        <span id="alerta-chefe-nome">Um chefe entrou no setor.</span>
+      </div>
+
+      <p id="dica-campo" class="dica-campo">Clique em um slot vazio para construir · clique em uma torre para melhorar</p>
+      <p id="dica-toque" class="dica-toque so-toque">Toque em um slot para construir · arraste para girar · pinça para zoom</p>
+
+      <!-- Painel construir -->
+      <div id="painel-construir" class="painel-flutuante painel-construir" hidden>
+        <h3>Construir torre</h3>
+        <div class="cartoes cartoes--torres">
+          <button class="torre-card" data-torre="metralhadora" type="button">
+            <span class="torre-nome">Metralhadora</span>
+            <span class="torre-alvo">Alvo: terrestre</span>
+            <span class="torre-custo">$100</span>
+            <span class="torre-tecla">1</span>
+          </button>
+          <button class="torre-card" data-torre="antiaereo" type="button">
+            <span class="torre-nome">Antiaéreo</span>
+            <span class="torre-alvo">Alvo: aéreo</span>
+            <span class="torre-custo">$140</span>
+            <span class="torre-tecla">2</span>
+          </button>
+          <button class="torre-card" data-torre="morteiro" type="button">
+            <span class="torre-nome">Morteiro</span>
+            <span class="torre-alvo">Alvo: terrestre · área</span>
+            <span class="torre-custo">$130</span>
+            <span class="torre-tecla">3</span>
+          </button>
+          <button class="torre-card" data-torre="tesla" type="button">
+            <span class="torre-nome">Tesla</span>
+            <span class="torre-alvo">Alvo: terrestre e aéreo · cadeia</span>
+            <span class="torre-custo">$160</span>
+            <span class="torre-tecla">4</span>
+          </button>
+          <button class="torre-card" data-torre="criogenica" type="button">
+            <span class="torre-nome">Criogênica</span>
+            <span class="torre-alvo">Alvo: terrestre e aéreo · lentidão</span>
+            <span class="torre-custo">$110</span>
+            <span class="torre-tecla">5</span>
+          </button>
+          <button class="torre-card" data-torre="missil" type="button">
+            <span class="torre-nome">Míssil</span>
+            <span class="torre-alvo">Alvo: terrestre e aéreo · teleguiado</span>
+            <span class="torre-custo">$180</span>
+            <span class="torre-tecla">6</span>
+          </button>
+        </div>
+        <div class="painel-acoes">
+          <button id="btn-fechar-construir" class="botao botao--fraco" type="button">Fechar</button>
+        </div>
+      </div>
+
+      <!-- Painel torre -->
+      <div id="painel-torre" class="painel-flutuante painel-torre" hidden>
+        <h3 class="torre-nome">Torre</h3>
+        <dl class="torre-atributos">
+          <div><dt>Nível</dt><dd class="torre-nivel">1</dd></div>
+          <div><dt>Dano</dt><dd class="torre-dano">—</dd></div>
+          <div><dt>Alcance</dt><dd class="torre-alcance">—</dd></div>
+          <div><dt>Cadência</dt><dd class="torre-cadencia">—</dd></div>
+        </dl>
+        <div class="painel-acoes painel-acoes--torre">
+          <button id="btn-melhorar" class="botao botao--forte" type="button">Melhorar $0</button>
+          <button id="btn-vender" class="botao botao--vender" type="button">Vender +$0</button>
+          <button id="btn-fechar-torre" class="botao botao--fraco" type="button">Fechar</button>
+        </div>
+      </div>
+
+      <!-- Painel tropas -->
+      <div id="painel-tropas" class="painel-flutuante painel-tropas" hidden>
+        <h3>Tropas especiais</h3>
+        <p class="painel-dica">Máximo de uma tropa viva de cada tipo. Posicione em um ponto livre.</p>
+        <div class="cartoes cartoes--tropas">
+          <button class="tropa-card" data-tropa="fuzileiros" type="button">
+            <span class="tropa-nome">Esquadrão de Fuzileiros</span>
+            <span class="tropa-desc">Bloqueia até 4 terrestres · alcance 8</span>
+            <span class="tropa-custo">$90</span>
+            <span id="tropa-estado-fuzileiros" class="tropa-estado">Posicionar</span>
+            <span class="torre-tecla">7</span>
+          </button>
+          <button class="tropa-card" data-tropa="antiaerea" type="button">
+            <span class="tropa-nome">Equipe Antiaérea</span>
+            <span class="tropa-desc">Só atira em aéreos · alcance 16</span>
+            <span class="tropa-custo">$70</span>
+            <span id="tropa-estado-antiaerea" class="tropa-estado">Posicionar</span>
+            <span class="torre-tecla">8</span>
+          </button>
+          <button class="tropa-card" data-tropa="sniper" type="button">
+            <span class="tropa-nome">Sniper de Elite</span>
+            <span class="tropa-desc">Alvo de maior vida · alcance 30</span>
+            <span class="tropa-custo">$110</span>
+            <span id="tropa-estado-sniper" class="tropa-estado">Posicionar</span>
+            <span class="torre-tecla">9</span>
+          </button>
+        </div>
+        <div class="painel-acoes">
+          <button id="btn-fechar-tropas" class="botao botao--fraco" type="button">Fechar</button>
+        </div>
+      </div>
+
+      <!-- Tutorial de 6 passos -->
+      <div id="tutorial" class="tutorial" hidden>
+        <div class="tutorial-caixa">
+          <p id="tutorial-passo" class="tutorial-passo">Passo 1 de 6</p>
+          <p id="tutorial-texto" class="tutorial-texto">Clique em um slot vazio para construir sua primeira torre.</p>
+          <button id="btn-tutorial-ok" class="botao botao--forte" type="button">Entendi</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= VITÓRIA ================= -->
+    <div id="screen-victory" class="screen screen--overlay" data-screen="victory" hidden>
+      <div class="painel painel--fim">
+        <h2 class="titulo-fim">Setor defendido!</h2>
+        <p id="vitoria-mapa" class="fim-mapa">Deserto</p>
+        <p class="fim-resumo">Vidas restantes: <strong id="vitoria-vidas">20</strong></p>
+        <p id="vitoria-estrelas" class="fim-estrelas">★★★</p>
+        <div class="painel-acoes">
+          <button id="btn-proxima-missao" class="botao botao--forte" type="button">Próxima missão</button>
+          <button id="btn-vitoria-missoes" class="botao" type="button">Selecionar missão</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= DERROTA ================= -->
+    <div id="screen-defeat" class="screen screen--overlay" data-screen="defeat" hidden>
+      <div class="painel painel--fim">
+        <h2 class="titulo-fim titulo-fim--derrota">A base caiu.</h2>
+        <p id="derrota-mapa" class="fim-mapa">Deserto</p>
+        <p class="fim-resumo">Tente outra vez, comandante.</p>
+        <div class="painel-acoes">
+          <button id="btn-tentar-de-novo" class="botao botao--forte" type="button">Tentar de novo</button>
+          <button id="btn-voltar-missoes" class="botao" type="button">Voltar às missões</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= PAUSA ================= -->
+    <div id="screen-pause" class="screen screen--overlay" data-screen="pause" hidden>
+      <div class="painel painel--fim">
+        <h2 class="titulo-fim">Jogo pausado</h2>
+        <p class="fim-resumo">Respire fundo, comandante. Os inimigos esperam.</p>
+        <div class="painel-acoes">
+          <button id="btn-continuar" class="botao botao--forte" type="button">Continuar</button>
+          <button id="btn-sair" class="botao botao--fraco" type="button">Sair para o menu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= AJUDA ================= -->
+    <div id="screen-help" class="screen screen--overlay" data-screen="help" hidden>
+      <div class="painel painel--ajuda">
+        <h2>Ajuda</h2>
+        <div class="ajuda-colunas">
+          <div>
+            <h3>Controles</h3>
+            <ul class="lista-ajuda">
+              <li>Arrastar com o botão esquerdo: orbitar a câmera</li>
+              <li>Arrastar com o botão direito: deslocar a câmera</li>
+              <li>Roda do mouse: aproximar e afastar</li>
+              <li>Clique em slot vazio: construir · clique em torre: painel</li>
+              <li>Botões 1 a 6: constroem a torre correspondente no slot selecionado</li>
+              <li>Botões 7, 8 e 9: posicionam fuzileiros, antiaérea e sniper</li>
+              <li>U melhora · V vende · N inicia a onda · F alterna 1x/2x</li>
+              <li>Espaço pausa · M alterna o som · H abre a ajuda · Esc fecha</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Como jogar</h3>
+            <ul class="lista-ajuda">
+              <li>Construa torres durante a preparação e durante a onda.</li>
+              <li>Torres terrestres não atingem inimigos aéreos; use antiaéreo, tesla, criogênica ou míssil.</li>
+              <li>Cada onda concluída rende um bônus. A caixa não passa de um setor para o outro.</li>
+              <li>Vidas no fim do setor definem as estrelas: 3 = 20 vidas, 2 = 14 a 19, 1 = 1 a 13.</li>
+              <li>Chefes aparecem nas ondas 8, 16 e 24 e resistem à metade da lentidão.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="ajuda-movel so-toque">
+          <h3>No celular e no tablet</h3>
+          <ul class="lista-ajuda">
+            <li><strong>Um dedo arrastado</strong> gira a câmera · <strong>dois dedos</strong> dão pinça (zoom) e deslocam</li>
+            <li><strong>Toque</strong> em um slot vazio para construir · toque numa torre para melhorar ou vender</li>
+            <li>Os botões <strong>−</strong> e <strong>+</strong> na barra superior também aproximam e afastam</li>
+            <li><strong>Instalar como app:</strong> no Android/Chrome use o menu → "Instalar app"; no iPad/Safari use Compartilhar → "Adicionar à Tela de Início"</li>
+          </ul>
+        </div>
+        <div class="painel-acoes">
+          <button id="btn-fechar-ajuda" class="botao botao--forte" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= CONTROLES (menu) ================= -->
+    <div id="screen-controls" class="screen screen--overlay" data-screen="controls" hidden>
+      <div class="painel painel--ajuda">
+        <h2>Controles</h2>
+        <ul class="lista-ajuda lista-ajuda--duas">
+          <li><strong>Mouse esquerdo arrastado</strong> orbita a câmera</li>
+          <li><strong>Mouse direito arrastado</strong> desloca a câmera</li>
+          <li><strong>Roda do mouse</strong> aproxima e afasta</li>
+          <li><strong>Clique esquerdo</strong> constrói em slot vazio ou abre a torre</li>
+          <li><strong>1 a 6</strong> constroem torres</li>
+          <li><strong>7, 8 e 9</strong> posicionam tropas especiais</li>
+          <li><strong>U</strong> melhora · <strong>V</strong> vende</li>
+          <li><strong>N</strong> inicia a onda · <strong>F</strong> alterna 1x/2x</li>
+          <li><strong>Espaço</strong> pausa · <strong>M</strong> silencia</li>
+          <li><strong>H</strong> ajuda · <strong>Esc</strong> fecha painéis</li>
+        </ul>
+        <div class="ajuda-movel so-toque">
+          <h3>No celular e no tablet</h3>
+          <ul class="lista-ajuda">
+            <li><strong>Arraste um dedo</strong> para girar · <strong>pinça</strong> para zoom · <strong>dois dedos</strong> para deslocar</li>
+            <li><strong>Toque</strong> no slot para construir e na torre para melhorar/vender</li>
+            <li><strong>Instalar como app:</strong> Android/Chrome → menu "Instalar app"; iPad/Safari → Compartilhar → "Adicionar à Tela de Início"</li>
+          </ul>
+        </div>
+        <div class="painel-acoes">
+          <button id="btn-fechar-controles" class="botao botao--forte" type="button">Voltar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <noscript>
+      <div class="sem-js">Este jogo precisa de JavaScript e WebGL habilitados no navegador.</div>
+    </noscript>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
