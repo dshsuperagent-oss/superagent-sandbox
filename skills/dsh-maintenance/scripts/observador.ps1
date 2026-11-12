@@ -3,10 +3,11 @@
 # Roda FORA da arvore do DSH (Startup do usuario), sem admin.
 # Grava em <DataDir>\observacao\:
 #   snapshot-YYYY-MM-DD.jsonl       (2 s)  saude do alvo + HTTP + conexoes
-#   processos-YYYY-MM-DD.jsonl      (100 ms, diff) processos novos/que sairam
+#   processos-YYYY-MM-DD.jsonl      (~25 ms, diff) processos novos/que sairam
 #   eventos-YYYY-MM-DD.jsonl        (30 s) Event Log System/Application/TaskScheduler
 #   hash-sessoes-YYYY-MM-DD.jsonl   (30 s) mtime/tamanho (hash parcial quando muda)
 #   veredito-YYYYMMDD-HHmmss.json   (na queda) classificacao + evidencias
+#   resumo-YYYY-MM-DD.jsonl         (quando o teto diario de disco e atingido)
 #   estado.json                     (5 s)  heartbeat do observador
 #
 # NUNCA reinicia nem encerra o DSH. Quem sobe servidor morto e o watchdog-3080.ps1.
@@ -17,7 +18,8 @@ param(
     [int]$Port = 3080,
     [int]$TargetPid = 0,
     [int]$SnapshotSec = 2,
-    [int]$ProcessPollMs = 100,
+    [int]$ProcessPollMs = 25,
+    [double]$MaxDayMb = 150,
     [int]$EventSec = 30,
     [int]$SessionSec = 30,
     [int]$HeartbeatSec = 5,
@@ -33,8 +35,16 @@ param(
 
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'lib.ps1')
+. (Join-Path $PSScriptRoot 'captura.ps1')
 
-$Versao = '1.0'
+# Teto diario de disco (issue #33): o churn de processos passava de 200 MB/dia.
+# A partir do teto o observador para de gravar processos/snapshots e passa a
+# escrever um resumo do dia (resumo-YYYY-MM-DD.jsonl), em vez de crescer sem limite.
+if (Get-Command Set-ObservationBudget -ErrorAction SilentlyContinue) {
+    Set-ObservationBudget -MaxDayMb $MaxDayMb
+}
+
+$Versao = '1.1'
 $ObsDir = Join-Path $DataDir 'observacao'
 $LogDir = Join-Path $DataDir 'logs'
 foreach ($d in @($DataDir, $ObsDir, $LogDir)) {
@@ -70,6 +80,11 @@ $script:HungVerdictDone = $false
 $script:LastVerdictPid = 0
 $script:LastVerdictAt = $null
 $script:LastPortInfo = $null
+$script:MotorOk = $false
+$script:MotorErro = $null
+$script:BudgetState = $null
+$script:LastResumoAt = $null
+$script:BudgetLogged = $false
 
 $script:RxSuspect = '(?i)(taskkill|stop-process|restart-dsh|dsh-diario|watchdog-3080|supervisor-dsh|\b3080\b|/PID\s+\d+|pkill)'
 $script:SuspectNames = @('taskkill.exe', 'taskkill', 'powershell.exe', 'powershell', 'pwsh.exe', 'pwsh', 'cmd.exe', 'cmd', 'wmic.exe', 'taskmgr.exe', 'procexp.exe', 'procexp64.exe', 'processhacker.exe', 'psexec.exe', 'schtasks.exe', 'node.exe', 'node')
@@ -79,6 +94,10 @@ $target = @{
     alive     = $false
     start     = $null
     name      = $null
+    ppid      = 0
+    cmdline   = $null
+    fonte     = $null
+    error     = $null
     adopted_at = $null
     fixed     = ($TargetPid -gt 0)
     miss      = 0
@@ -103,6 +122,7 @@ function Get-ProcessStartSafe([int]$ProcId) {
 # dono = PID do alvo tambem prova vida.
 function Test-TargetAlive {
     if ($target.pid -le 0) { return $false }
+    if ($script:MotorOk -and (Test-CapturaAlive $target.pid)) { return $true }
     if ($script:ProcMap.ContainsKey([int]$target.pid)) { return $true }
     if (Test-ProcessAlive $target.pid) { return $true }
     if ($null -ne $script:LastPortInfo -and $script:LastPortInfo.listen -and [int]$script:LastPortInfo.owner_pid -eq [int]$target.pid) { return $true }
@@ -160,8 +180,9 @@ function Get-SuspectInfo([int]$ProcId, [string]$Name, [string]$Cmdline, $Ancesto
     return [pscustomobject]@{ suspect = ($reasons.Count -gt 0); reasons = $reasons.ToArray() }
 }
 
-function Invoke-ProcPoll {
-    # Snapshot de PIDs/PPIDs sem alocar objeto Process por processo (barato).
+function Invoke-ProcPollLegacy {
+    # Caminho ANTIGO (usado so se o motor de captura nao puder subir): snapshot de
+    # PIDs/PPIDs sem alocar objeto Process por processo (barato, mas no mesmo thread).
     $pairs = @(Get-ProcessIdPairs)
     $nowMap = @{}
     $nowPpid = @{}
@@ -305,6 +326,224 @@ function Invoke-ProcPoll {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Captura rapida (issue #33): a thread de captura do captura.ps1 faz o diff de
+# PIDs/PPIDs a cada ~25 ms e enfileira os processos novos; aqui so consumimos a
+# fila e enriquecemos (cmdline/ancestrais) fora do caminho critico do poll.
+# ---------------------------------------------------------------------------
+
+function Get-ProcessNameFast([int]$ProcId) {
+    try {
+        $p = Get-Process -Id $ProcId -ErrorAction Stop
+        try { return [string]$p.ProcessName } finally { $p.Dispose() }
+    } catch { return '?' }
+}
+
+# ppid/cmdline do alvo: PEB (mesmo usuario). Se negado, registra o motivo, nunca
+# silencioso (issue #33, item 4).
+function Get-TargetDetail {
+    if ($target.pid -le 0) { return }
+    $peb = Get-PebInfo $target.pid
+    if ($peb.ok) {
+        $target.ppid = [int]$peb.ppid
+        $target.cmdline = $peb.cmdline
+        $target.fonte = 'peb'
+        $target.error = $null
+        return
+    }
+    $target.fonte = 'peb_negado'
+    $target.error = [string]$peb.error
+    if ($null -ne $peb.ppid -and [int]$peb.ppid -gt 0) { $target.ppid = [int]$peb.ppid }
+}
+
+function Invoke-CapturaBaseline {
+    $itens = @(Receive-CapturaItem -Max 40000)
+    $st = Get-CapturaState
+    $script:Bootstrapped = $true
+    $script:LastProcPoll = Get-Date
+    if ($target.pid -gt 0) { $target.alive = [bool](Test-CapturaAlive $target.pid) }
+    $rec = [pscustomobject]@{
+        ts         = Get-IsoNow
+        event      = 'baseline'
+        count      = [int]$st.visiveis
+        target_pid = $target.pid
+        alvo_vivo  = $target.alive
+        fonte      = 'nqsi'
+        poll_ms    = [int]$st.interval_ms
+        detalhe    = 'primeiro ciclo: diff de PIDs/PPIDs pela API nativa; sem PEB/cmdline por processo'
+    }
+    $null = Add-JsonlRecord $ObsDir 'processos' $rec (Get-DataDay)
+    Write-PlainLog $LogDir 'observador' ('baseline: ' + $st.visiveis + ' processos visiveis; itens iniciais descartados=' + $itens.Count + '; alvo_vivo=' + $target.alive)
+}
+
+function Invoke-CapturaDrain {
+    $itens = @(Receive-CapturaItem -Max 500)
+    if ($itens.Count -eq 0) { return }
+    $day = Get-DataDay
+    $fileName = 'processos-' + $day.ToString('yyyy-MM-dd') + '.jsonl'
+    $pares = @(Get-CapturaPairs)
+    $ppidMap = @{}
+    for ($i = 0; $i -lt $pares.Count; $i += 2) { $ppidMap[[int]$pares[$i]] = [int]$pares[$i + 1] }
+
+    foreach ($it in $itens) {
+        if ($it.kind -eq 'start') {
+            $procId = [int]$it.pid
+            if ($procId -le 0 -or $procId -eq $PID) { continue }
+            $name = [string]$it.name
+            if (-not $name -or $name -eq '?') { $name = Get-ProcessNameFast $procId }
+            $ppid = [int]$it.ppid
+            if ($ppid -le 0) { $ppid = [int](Get-CapturaPpid $procId) }
+            # Filhos diretos do observador usados na sonda HTTP (curl/netstat) nao entram.
+            if ($ppid -eq $PID -and $name -match '^(?i)(curl|netstat|where|findstr)$') { continue }
+            $cmdline = $it.cmdline
+            # Cadeia de ancestrais SO para quem interessa (suspeito ou filho do alvo):
+            # ela e o campo mais caro do registro e o churn chegaria a ~500 MB/dia.
+            $s0 = Get-SuspectInfo $procId $name $cmdline @()
+            $anc = @()
+            if ($s0.suspect -or ($target.pid -gt 0 -and $ppid -eq $target.pid)) {
+                $anc = @(Get-AncestorChain $ppid 4 $ppidMap)
+            }
+            if ($anc.Count -gt 0) { $s = Get-SuspectInfo $procId $name $cmdline $anc } else { $s = $s0 }
+            $maxCmd = 400
+            if ($s.suspect) { $maxCmd = 1500 }
+            $rec = [pscustomobject]@{
+                ts         = Get-IsoNow
+                event      = 'start'
+                pid        = $procId
+                ppid       = $ppid
+                name       = $name
+                cmdline    = (Truncate-Text $cmdline $maxCmd)
+                start      = $it.create_time
+                ancestors  = $anc
+                suspect    = $s.suspect
+                reasons    = $s.reasons
+                target_pid = $target.pid
+                fonte      = 'nqsi25'
+                error      = $it.error
+                poll_ms    = [int]$ProcessPollMs
+                seen_ms    = [int]$it.seen_ms
+            }
+            $line = Add-JsonlRecord $ObsDir 'processos' $rec $day
+            $script:Amostras.processos = [int]$script:Amostras.processos + 1
+            Add-RecentProc $rec $line $fileName
+            $script:ProcCache[$procId] = $rec
+            if ($target.pid -gt 0 -and $procId -eq $target.pid) {
+                $target.alive = $true
+                if (-not $target.start) { $target.start = $it.create_time }
+            }
+        } else {
+            $procId = [int]$it.pid
+            if ($procId -le 0) { continue }
+            $info = $script:ProcCache[$procId]
+            $pName = [string]$it.name
+            $pPpid = [int]$it.ppid
+            $pCmd = $it.cmdline
+            $pStart = $it.create_time
+            $pAnc = @()
+            $pSus = $false
+            $pRea = @()
+            if ($null -ne $info) {
+                $pName = $info.name
+                $pPpid = [int]$info.ppid
+                $pCmd = $info.cmdline
+                $pStart = $info.start
+                $pAnc = @($info.ancestors)
+                $pSus = [bool]$info.suspect
+                $pRea = @($info.reasons)
+            }
+            if (-not $pName) { $pName = Get-ProcessNameFast $procId }
+            # Registro de saida de processo comum nao repete cmdline/ancestrais (o
+            # registro de 'start' ja tem): menos disco sob churn, mesmo veredito.
+            if (-not $pSus) { $pCmd = $null; $pAnc = @() }
+            # Alvo: metadados lidos no inicio (issue #33, item 4) sempre no registro.
+            if ($target.pid -gt 0 -and $procId -eq $target.pid) {
+                if ($target.name) { $pName = $target.name }
+                if ([int]$target.ppid -gt 0) { $pPpid = [int]$target.ppid }
+                if ($target.cmdline) { $pCmd = $target.cmdline }
+                if ($target.start) { $pStart = $target.start }
+            }
+            $lifetime = $it.lifetime_ms
+            if ($null -eq $lifetime -and $pStart) {
+                try { $lifetime = [math]::Round(((Get-Date) - [datetime]::Parse([string]$pStart)).TotalMilliseconds, 0) } catch { }
+            }
+            $vivoFim = $false
+            if ($target.pid -gt 0) { $vivoFim = [bool](Test-TargetAlive) }
+            $rec = [pscustomobject]@{
+                ts          = Get-IsoNow
+                event       = 'exit'
+                pid         = $procId
+                ppid        = $pPpid
+                name        = $pName
+                cmdline     = $pCmd
+                start       = $pStart
+                lifetime_ms = $lifetime
+                ancestors   = $pAnc
+                suspect     = $pSus
+                reasons     = $pRea
+                target_pid  = $target.pid
+                alvo_vivo_no_fim = $vivoFim
+                fonte       = 'nqsi25'
+                error       = $it.error
+                poll_ms     = [int]$ProcessPollMs
+                seen_ms     = [int]$it.seen_ms
+            }
+            $line = Add-JsonlRecord $ObsDir 'processos' $rec $day
+            $script:Amostras.processos = [int]$script:Amostras.processos + 1
+            Add-RecentProc $rec $line $fileName
+            $script:ProcCache.Remove($procId)
+        }
+    }
+}
+
+# Morte do alvo: exige 3 leituras negativas e confirmacao fresca da porta (mesma
+# regra do caminho antigo), para nao gerar falso veredito quando o processo nao e
+# visivel ao sandbox.
+function Test-TargetDeath {
+    if ($target.pid -le 0 -or -not $target.alive) { return }
+    if (Test-TargetAlive) {
+        $target.miss = 0
+        return
+    }
+    $target.miss = [int]$target.miss + 1
+    if ($target.miss -lt 3) { return }
+    $confirm = Get-PortInfo $Port
+    if ($confirm.listen -and [int]$confirm.owner_pid -eq [int]$target.pid) {
+        $target.miss = 0
+        return
+    }
+    New-Verdict -Causa 'processo_alvo_desapareceu' -VictimPid ([int]$target.pid)
+    $target.alive = $false
+    $target.pid = 0
+    $target.start = $null
+    $target.name = $null
+    $target.ppid = 0
+    $target.cmdline = $null
+    $target.miss = 0
+}
+
+# Teto diario de disco: quando estoura, escreve UM resumo por minuto (nunca cresce
+# sem limite) e segue observando (o que importa e o veredito, nao o log de tudo).
+function Invoke-BudgetCheck {
+    if (-not (Get-Command Get-ObservationBudgetState -ErrorAction SilentlyContinue)) { return }
+    $st = Get-ObservationBudgetState
+    $script:BudgetState = $st
+    if (-not $st.excedido) { return }
+    $agora = Get-Date
+    if ($null -ne $script:LastResumoAt -and ($agora - $script:LastResumoAt).TotalSeconds -lt 60) { return }
+    if (Get-Command Write-ObservationSummary -ErrorAction SilentlyContinue) {
+        Write-ObservationSummary -ObsDir $ObsDir -Day (Get-DataDay) -State $st -Extra @{
+            ciclos   = $script:Ciclos
+            amostras = $script:Amostras
+            alvo_pid = $target.pid
+        }
+    }
+    $script:LastResumoAt = $agora
+    if (-not $script:BudgetLogged) {
+        $script:BudgetLogged = $true
+        Write-PlainLog $LogDir 'observador' ('teto diario de disco atingido (' + $st.usado_mb + ' MB de ' + $st.max_mb + ' MB); gravando resumo do dia')
+    }
+}
+
 function Invoke-Snapshot {
     $day = Get-DataDay
     $portInfo = Get-PortInfo $Port
@@ -321,23 +560,26 @@ function Invoke-Snapshot {
             try { $target.name = [string]$tp.ProcessName } finally { $tp.Dispose() }
         } catch { }
         $target.adopted_at = Get-IsoNow
+        Get-TargetDetail
         $rec = [pscustomobject]@{
             ts         = Get-IsoNow
             event      = 'target_adopted'
             pid        = $target.pid
-            ppid       = 0
+            ppid       = [int]$target.ppid
             name       = $target.name
-            cmdline    = $null
+            cmdline    = (Truncate-Text $target.cmdline 1500)
             start      = $target.start
             ancestors  = @()
             suspect    = $false
             reasons    = @('dono_da_porta')
             target_pid = $target.pid
+            fonte      = $target.fonte
+            error      = $target.error
         }
         $line = Add-JsonlRecord $ObsDir 'processos' $rec $day
         Add-RecentProc $rec $line ('processos-' + $day.ToString('yyyy-MM-dd') + '.jsonl')
         $script:ProcCache[[int]$target.pid] = $rec
-        Write-PlainLog $LogDir 'observador' ('alvo adotado: pid ' + $target.pid + ' na porta ' + $Port)
+        Write-PlainLog $LogDir 'observador' ('alvo adotado: pid ' + $target.pid + ' na porta ' + $Port + ' fonte=' + $target.fonte + ' error=' + $target.error)
     }
 
     $http = [pscustomobject]@{ code = 'n/a'; ms = 0 }
@@ -471,13 +713,19 @@ function New-Evidence([string]$Fonte, [int]$Linha, [string]$Hora, $Trecho) {
 function Find-Killer([datetime]$Since, [int]$VictimPid) {
     $best = $null
     $bestScore = -1
+    # PIDs que PROVARAM nao ter matado: sairam com o alvo ainda vivo (ex.: taskkill
+    # barrado por acesso negado). Vale descartar o PID inteiro, nao so o registro,
+    # senao o evento 'start' do mesmo processo voltaria a ser candidato.
+    $inocentes = @{}
+    foreach ($r in $script:RecentProc) {
+        if ($r.alvo_vivo_no_fim -eq $true) { $inocentes[[int]$r.pid] = $true }
+    }
     foreach ($r in $script:RecentProc) {
         $when = $null
         try { $when = [datetime]::Parse([string]$r.ts) } catch { $when = $null }
         if ($null -eq $when -or $when -lt $Since) { continue }
         if (-not $r.suspect) { continue }
-        # taskkill/Stop-Process que saiu com o alvo ainda vivo NAO matou: nao citar.
-        if ($r.alvo_vivo_no_fim -eq $true) { continue }
+        if ($inocentes.ContainsKey([int]$r.pid)) { continue }
         $score = 0
         $nm = ''
         if ($r.name) { $nm = $r.name.ToLowerInvariant() }
@@ -594,8 +842,8 @@ function New-Verdict([string]$Causa, [int]$VictimPid) {
         $alvoEvid++
     }
 
-    $null = $limit.Add('Sem admin nao ha ETW/WMI process events/4688: processos com vida menor que o intervalo de poll (' + $ProcessPollMs + ' ms) podem escapar.')
-    $null = $limit.Add('CommandLine/PPID vem do PEB do processo alvo; outro usuario/integridade pode negar leitura (error OpenProcess:5).')
+    $null = $limit.Add('Sem admin nao ha ETW/WMI process events/4688: processos com vida menor que o intervalo de captura (' + $ProcessPollMs + ' ms) ainda podem escapar.')
+    $null = $limit.Add('CommandLine/PPID vem do PEB do processo alvo; outro usuario/integridade pode negar leitura (error OpenProcess:5); processo wow64 nao expoe cmdline por este caminho.')
 
     $veredito = [pscustomobject]@{
         versao      = $Versao
@@ -650,6 +898,11 @@ function Write-Heartbeat {
         http_probe      = $HttpProbe
         retencao_dias   = $RetentionDays
         force_date      = $ForceDate
+        poll_ms         = $ProcessPollMs
+        max_day_mb      = $MaxDayMb
+        disco           = $script:BudgetState
+        captura         = $(if ($script:MotorOk) { Get-CapturaState } else { $null })
+        motor_erro      = $script:MotorErro
         mem_priv_mb     = $(try { [math]::Round([System.Diagnostics.Process]::GetCurrentProcess().PrivateMemorySize64 / 1MB, 1) } catch { $null })
         gc_mb           = $(try { [math]::Round([System.GC]::GetTotalMemory($false) / 1MB, 1) } catch { $null })
         ultimo_trim     = $script:LastTrim
@@ -707,28 +960,48 @@ $null = Add-JsonlRecord $ObsDir 'hash-sessoes' ([pscustomobject]@{
     changed = @()
 }) $day0
 
-# Alvo fixado por parametro: UM registro, sem PEB.
+# Alvo fixado por parametro: UM registro com ppid/cmdline lidos do PEB (issue #33,
+# item 4). Se a leitura for negada, cmdline fica null com o motivo em 'error'.
 if ($TargetPid -gt 0) {
+    Get-TargetDetail
     $recT = [pscustomobject]@{
         ts         = Get-IsoNow
         event      = 'target_fixed'
         pid        = $target.pid
-        ppid       = 0
+        ppid       = [int]$target.ppid
         name       = $target.name
-        cmdline    = $null
+        cmdline    = (Truncate-Text $target.cmdline 1500)
         start      = $target.start
         ancestors  = @()
         suspect    = $false
         reasons    = @('parametro_targetpid')
         target_pid = $target.pid
-        fonte      = 'parametro'
-        error      = $null
+        fonte      = $target.fonte
+        error      = $target.error
     }
     $lineT = Add-JsonlRecord $ObsDir 'processos' $recT $day0
     Add-RecentProc $recT $lineT ('processos-' + $day0.ToString('yyyy-MM-dd') + '.jsonl')
-    # O alvo entra no cache para o registro de saida (name/start ja conhecidos).
+    # O alvo entra no cache para o registro de saida (name/start/cmdline/ppid conhecidos).
     $script:ProcCache[[int]$target.pid] = $recT
+    Write-PlainLog $LogDir 'observador' ('detalhe do alvo: ppid=' + $target.ppid + ' cmdline=' + (Truncate-Text $target.cmdline 120) + ' fonte=' + $target.fonte + ' error=' + $target.error)
 }
+
+# Motor de captura rapida: thread dedicada de diff (NQSI ~25 ms) + fila de
+# enriquecimento. Se falhar, o observador cai no caminho antigo (100 ms) e
+# registra o motivo no log.
+$script:MotorOk = Start-CapturaEngine -IntervalMs $ProcessPollMs
+if ($script:MotorOk) {
+    $stM = Get-CapturaState
+    Write-PlainLog $LogDir 'observador' ('motor de captura ativo: poll ' + $stM.interval_ms + ' ms (nqsi), visiveis=' + $stM.visiveis)
+    # Baseline barato: descarta a fila inicial (processos que ja existiam).
+    Start-Sleep -Milliseconds 150
+    Invoke-CapturaBaseline
+} else {
+    $script:MotorErro = [string](Get-CapturaState).erro
+    Write-PlainLog $LogDir 'observador' ('motor de captura INDISPONIVEL (' + $script:MotorErro + '); usando poll antigo de ' + $ProcessPollMs + ' ms')
+    $script:LastProcPoll = (Get-Date).AddDays(-1)
+}
+
 
 Invoke-Cleanup
 # Libera o working set ja no startup (o primeiro poll ainda vai alocar um pouco).
@@ -740,6 +1013,7 @@ $nextSession = (Get-Date).AddSeconds(3)
 $nextHeartbeat = (Get-Date).AddSeconds($HeartbeatSec)
 $nextCleanup = (Get-Date).AddMinutes(10)
 $nextTrim = (Get-Date).AddSeconds(15)
+$nextBudget = (Get-Date).AddSeconds(5)
 $script:LastProcPoll = (Get-Date).AddDays(-1)
 
 try {
@@ -748,8 +1022,12 @@ try {
         $now = Get-Date
         $script:Ciclos = [int]$script:Ciclos + 1
         try {
-            if (($now - $script:LastProcPoll).TotalMilliseconds -ge $ProcessPollMs) {
-                Invoke-ProcPoll
+            if ($script:MotorOk) {
+                # Consome a fila do motor (nunca bloqueia o poll de 25 ms).
+                Invoke-CapturaDrain
+                Test-TargetDeath
+            } elseif (($now - $script:LastProcPoll).TotalMilliseconds -ge $ProcessPollMs) {
+                Invoke-ProcPollLegacy
             }
             if ($now -ge $nextSnapshot) {
                 Invoke-Snapshot
@@ -771,6 +1049,10 @@ try {
                 Invoke-Cleanup
                 $nextCleanup = (Get-Date).AddMinutes(10)
             }
+            if ($now -ge $nextBudget) {
+                Invoke-BudgetCheck
+                $nextBudget = (Get-Date).AddSeconds(10)
+            }
             if ($now -ge $nextTrim) {
                 Trim-ObserverMemory
                 $script:LastTrim = Get-IsoNow
@@ -783,6 +1065,7 @@ try {
         Start-Sleep -Milliseconds 20
     }
 } finally {
+    try { Stop-CapturaEngine } catch { }
     try { Write-Heartbeat } catch { }
     Close-JsonlWriters
     Write-PlainLog $LogDir 'observador' ('encerrado pid=' + $PID + ' ciclos=' + $script:Ciclos + ' erros=' + $script:Erros)

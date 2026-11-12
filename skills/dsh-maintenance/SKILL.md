@@ -71,8 +71,9 @@ Ordem de leitura — sempre nesta sequência, do mais barato ao mais caro:
    Get-Content $v.FullName -Raw | ConvertFrom-Json | Format-List
    ```
 
-3. **Processos no intervalo da queda** (poll de 100 ms; é aqui que aparece o
-   assassino, se ele existiu):
+3. **Processos no intervalo da queda** (poll de **25 ms**: uma thread dedicada faz
+   só o diff de PID/PPID; nome/cmdline/PEB/ancestrais vêm de uma fila de
+   enriquecimento — é aqui que aparece o assassino, se ele existiu):
 
    ```powershell
    $p = "$obs\processos-2026-11-11.jsonl"
@@ -84,6 +85,11 @@ Ordem de leitura — sempre nesta sequência, do mais barato ao mais caro:
    Processos que já existiam antes do observador não têm registro de `start`; a
    morte do alvo aparece no `snapshot`/`estado.json` e no veredito.
 
+   **Economia de disco:** `ancestors[]` só vem preenchido para processo
+   **suspeito** ou filho do alvo, e o `exit` de processo comum vem com
+   `cmdline=null` (o `start` do mesmo PID tem a linha). Ausência de `cmdline` num
+   `exit` não significa falha de leitura — procure o `start`.
+
 4. **Snapshots** em volta do instante (2 s cada): PID vivo/morto, HTTP, conexões.
 
 5. **Eventos** (30 s): Kernel-Power, WER/AppCrash, erros de serviço, TaskScheduler.
@@ -94,6 +100,12 @@ Ordem de leitura — sempre nesta sequência, do mais barato ao mais caro:
 7. **Console do supervisor**, se o DSH foi iniciado por ele:
    `$logs\dsh-console-timestamped.log` (stdout+stderr com timestamp) e
    `$logs\supervisor-AAAA-MM-DD.jsonl` (ExitCode + instante).
+
+8. **Resumo do dia** (`resumo-AAAA-MM-DD.jsonl`): só aparece quando o dia bateu o
+   teto de disco de **150 MB/dia** (`-MaxDayMb`) — nesse caso `snapshot`,
+   `processos`, `eventos` e `sessões` param de ser gravados. Leia antes de
+   concluir que "não houve registro": a linha traz `motivo`
+   (`teto_diario_atingido`) e `bloqueados` (quantos registros foram recusados).
 
 Montagem da linha do tempo (filtra uma janela e mistura as 3 fontes):
 
@@ -258,7 +270,7 @@ Get-ChildItem 'F:\ai\_lab\superagent-nativo\watcher\work' -Directory | Select-Ob
 | observador | `estado.json` com atraso ≤ 15 s, `ciclos` crescendo | > 45 s: ver `lacunas-*.jsonl`; relançar via `supervisor-observador.ps1`/Startup |
 | restart | tarefa Disabled/ausente, `restart-dsh.ps1.DESATIVADO` presente | **não** reative |
 | workspaces `watcher\work\<ticket>` | graváveis pelo usuário | se falhar `SetNamedSecurityInfoW failed (Win32 5)`: reportar `blocked` com o erro exato |
-| disco | datas só dos últimos 7 dias; sem arquivo gigante | rotação/retenção do observador |
+| disco | datas só dos últimos 7 dias; sem arquivo gigante; `resumo-*.jsonl` só quando o dia bateu 150 MB | rotação/retenção do observador; se o teto cortou, leia o `resumo-*.jsonl` |
 
 ## 6. Limites: o que exige admin e como reportar sem inventar
 
@@ -268,13 +280,28 @@ Sem sessão elevada **não** existe:
 - eventos WMI de criação/encerramento de processo (`Win32_ProcessStartTrace`) e ETW;
 - Sysmon/driver/filtro de kernel (nem instalado, nem instalável sem admin).
 
-O observador cobre a lacuna com um snapshot de PIDs/PPIDs via
-`NtQuerySystemInformation` a cada **100 ms** + leitura do PEB via
-`NtQueryInformationProcess`/`ReadProcessMemory` para `CommandLine` e `PPID`
-(mesmo usuário, sem admin), com fallback WMI quando disponível. Consequência
-honesta: **processo que nasce e morre em menos de 100 ms pode escapar**; e, se o
-assassino rodou elevado, ele ainda aparece na lista (nome/PID), mas `cmdline` e
-`ppid` podem vir vazios por falha de leitura do PEB.
+O observador cobre a lacuna com uma **thread dedicada** que faz o diff de
+PIDs/PPIDs via `NtQuerySystemInformation` a cada **25 ms** (`-ProcessPollMs`), e
+resolve nome/`CommandLine`/`PPID` **fora** desse caminho, numa fila de
+enriquecimento (`OpenProcess` + `QueryFullProcessImageNameW` + PEB via
+`NtQueryInformationProcess`/`ReadProcessMemory`, mesmo usuário, sem admin), com
+fallback WMI quando disponível. Consequências honestas:
+
+- **processo que nasce e morre em menos de ~25 ms pode escapar** — a janela entre
+  duas amostras é um ponto cego. Um `taskkill /F` bem-sucedido vive ~117–165 ms
+  (medido) e é capturado com folga de vários ticks;
+- **processo wow64 (32 bits) não tem `cmdline`** (o PEB lido é x64): o registro
+  vem com `error='wow64'` e `cmdline` nulo, mantendo `name`/`pid`/`ppid` válidos;
+- se o assassino rodou elevado, ele ainda aparece na lista (nome/PID), mas
+  `cmdline` e `ppid` podem vir vazios **com o motivo em `error`** (ex.:
+  `OpenProcess:5`) — não fica em branco sem explicação;
+- **o `taskkill` real só é validado pelo Lead, em shell normal.** O job restrito
+  do agente enxerga ~40 processos (medido) e o `taskkill.exe` recebe "Acesso
+  negado": o teste de aceite sai com SKIP (exit 3) e não há PASS de taskkill real
+  medido no sandbox do agente;
+- o dia que atinge o **teto de 150 MB** (`-MaxDayMb`) deixa de gravar
+  `snapshot`/`processos`/`eventos`/`sessões`; o `resumo-*.jsonl` registra o
+  motivo e quantos registros foram recusados.
 
 Como reportar quando a evidência não fecha:
 

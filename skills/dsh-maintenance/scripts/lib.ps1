@@ -418,6 +418,33 @@ $script:JsonlWriters = @{}
 $script:JsonlLines = @{}
 $script:UseWmiFallback = $false
 
+# ---------------------------------------------------------------------------
+# Teto de disco por dia (bytes UTF-8 realmente gravados)
+#
+# Motivo (issue 33): sob churn o JSONL cresce sem limite (~300 MB/dia medidos,
+# ~3,5 KB/s) e estoura o criterio de 200 MB/dia. O teto de 150 MB/dia e
+# aplicado na gravacao: contamos os bytes UTF-8 gravados no dia (todas as
+# categorias) e, ao atingir o teto, recusamos novas gravacoes de 'snapshot',
+# 'processos', 'eventos' e 'hash-sessoes' (Add-JsonlRecord devolve 0, contrato
+# antigo preservado). 'resumo' e demais categorias (ex.: 'lacunas',
+# 'supervisor') nunca sao bloqueadas: o resumo do dia tem de poder ser gravado
+# justamente quando o teto estoura.
+#
+# A contagem comeca pelo tamanho dos arquivos do dia que ja existem em ObsDir
+# (restart no meio do dia nao zera o teto) e depois avanca so com bytes que o
+# WriteLine confirmou. Estado: dia corrente + ObsDir corrente.
+# ---------------------------------------------------------------------------
+
+$script:ObsBudgetMaxMb = 150.0
+$script:ObsBudgetDay = $null
+$script:ObsBudgetDir = $null
+$script:ObsBudgetBytes = [long]0
+$script:ObsBudgetBlocked = 0
+$script:ObsBudgetInit = $false
+$script:ObsBudgetBytesPerMb = [double]1048576
+# Categorias sujeitas ao teto (as unicas que podem ser recusadas).
+$script:ObsBudgetCategories = @('snapshot', 'processos', 'eventos', 'hash-sessoes')
+
 function Open-JsonlWriter([string]$Path) {
     $dir = Split-Path $Path -Parent
     if (-not (Test-Path -LiteralPath $dir)) {
@@ -443,9 +470,155 @@ function Get-JsonlPath([string]$ObsDir, [string]$Category, [datetime]$Day) {
     return (Join-Path $ObsDir ('{0}-{1}.jsonl' -f $Category, $Day.ToString('yyyy-MM-dd')))
 }
 
+# --- teto de disco: configuracao, contagem e estado -------------------------
+
+# Define o teto diario em MB. Idempotente: chamar de novo com o mesmo valor nao
+# altera contagem nenhuma. Aceita fracao (ex.: 0.2 MB) para teste do corte; o
+# parametro e [double] de proposito para nao truncar fracoes em 0.
+function Set-ObservationBudget([double]$MaxDayMb = 150) {
+    if ($null -eq $MaxDayMb) { $MaxDayMb = 150 }
+    if ([double]$MaxDayMb -lt 0) { $MaxDayMb = 0 }
+    # Nao devolve nada de proposito: o chamador costuma ser o loop do observador
+    # (um valor no pipeline viraria saida perdida no console).
+    $script:ObsBudgetMaxMb = [double]$MaxDayMb
+}
+
+function Get-ObservationBudgetLimitBytes {
+    $mb = [double]$script:ObsBudgetMaxMb
+    if ($mb -lt 0) { $mb = 0 }
+    return [long][math]::Round($mb * $script:ObsBudgetBytesPerMb)
+}
+
+# Prepara a contagem do dia: soma o tamanho dos JSONL do dia que ja estao no
+# disco (todas as categorias, inclusive 'resumo'), para que um restart no meio
+# do dia nao reinicie o teto. So recalcula quando muda o dia ou o ObsDir.
+function Initialize-ObservationUsage([string]$ObsDir, [datetime]$Day) {
+    $dayKey = Format-Day $Day
+    if ($script:ObsBudgetInit -and $script:ObsBudgetDay -eq $dayKey -and $script:ObsBudgetDir -eq $ObsDir) { return }
+    $bytes = [long]0
+    try {
+        if (Test-Path -LiteralPath $ObsDir) {
+            $pattern = '*-' + $dayKey + '.jsonl'
+            $files = @(Get-ChildItem -LiteralPath $ObsDir -File -Filter $pattern -ErrorAction SilentlyContinue)
+            foreach ($f in $files) {
+                try { $bytes = $bytes + [long]$f.Length } catch { }
+            }
+        }
+    } catch { }
+    $script:ObsBudgetDay = [string]$dayKey
+    $script:ObsBudgetDir = [string]$ObsDir
+    $script:ObsBudgetBytes = [long]$bytes
+    $script:ObsBudgetBlocked = 0
+    $script:ObsBudgetInit = $true
+}
+
+# Bytes UTF-8 que o registro ocupa no arquivo: texto + quebra de linha do
+# StreamWriter (o arquivo e aberto sem BOM, entao o tamanho em disco bate).
+function Get-JsonlRecordBytes([string]$Json, $Writer = $null) {
+    if ($null -eq $Json) { $Json = '' }
+    $n = [int][System.Text.Encoding]::UTF8.GetByteCount($Json)
+    if ($null -ne $Writer) {
+        $nl = [string]$Writer.NewLine
+        if (-not $nl) { $nl = "`r`n" }
+        $n = $n + [int][System.Text.Encoding]::UTF8.GetByteCount($nl)
+    } else {
+        $n = $n + 2
+    }
+    return [int]$n
+}
+
+# true = o registro NAO pode ser gravado (teto do dia atingido) e ja conta em
+# bloqueados. Categorias fora da lista do teto devolvem sempre false.
+function Test-ObservationWriteBlocked([string]$ObsDir, [string]$Category, [datetime]$Day, [int]$Bytes) {
+    Initialize-ObservationUsage $ObsDir $Day
+    $cat = ([string]$Category).ToLowerInvariant()
+    if (-not ($script:ObsBudgetCategories -contains $cat)) { return $false }
+    $limit = Get-ObservationBudgetLimitBytes
+    if (($script:ObsBudgetBytes + [long]$Bytes) -gt $limit) {
+        $script:ObsBudgetBlocked = [int]$script:ObsBudgetBlocked + 1
+        return $true
+    }
+    return $false
+}
+
+# Estado do teto para log/resumo. Hashtable (contrato): max_mb, usado_bytes,
+# usado_mb, excedido, bloqueados, dia. 'excedido' = o dia ja esta cortando
+# (teto esgotado ou algum registro recusado).
+function Get-ObservationBudgetState {
+    $limit = Get-ObservationBudgetLimitBytes
+    $used = [long]$script:ObsBudgetBytes
+    $blocked = [int]$script:ObsBudgetBlocked
+    $dayKey = [string]$script:ObsBudgetDay
+    if (-not $dayKey) { $dayKey = Format-Day (Get-Date) }
+    return @{
+        max_mb      = [double]$script:ObsBudgetMaxMb
+        usado_bytes = $used
+        usado_mb    = [math]::Round(($used / $script:ObsBudgetBytesPerMb), 3)
+        excedido    = (($used -ge $limit) -or ($blocked -gt 0))
+        bloqueados  = $blocked
+        dia         = $dayKey
+    }
+}
+
+# Grava 1 linha de resumo do dia em resumo-YYYY-MM-DD.jsonl (categoria
+# 'resumo', nunca bloqueada pelo teto). Silenciosa de proposito (o chamador e o
+# loop do observador; um valor no pipeline viraria saida perdida). -Extra entra
+# como campos adicionais (contadores do observador, motivo, etc.); chaves ja
+# existentes no resumo sao ignoradas. O numero da linha pode ser lido depois com
+# Get-LineCount no arquivo resumo-YYYY-MM-DD.jsonl.
+function Write-ObservationSummary([string]$ObsDir, [datetime]$Day, $State = $null, [hashtable]$Extra = $null) {
+    $st = $State
+    if ($null -eq $st) { $st = Get-ObservationBudgetState }
+    $maxMb = [double]$script:ObsBudgetMaxMb
+    $usadoBytes = [long]$script:ObsBudgetBytes
+    $usadoMb = [math]::Round(($usadoBytes / $script:ObsBudgetBytesPerMb), 3)
+    $excedido = $false
+    $bloqueados = [int]$script:ObsBudgetBlocked
+    try { if ($null -ne $st.max_mb) { $maxMb = [double]$st.max_mb } } catch { }
+    try { if ($null -ne $st.usado_bytes) { $usadoBytes = [long]$st.usado_bytes } } catch { }
+    try { if ($null -ne $st.usado_mb) { $usadoMb = [double]$st.usado_mb } } catch { }
+    try { if ($null -ne $st.excedido) { $excedido = [bool]$st.excedido } } catch { }
+    try { if ($null -ne $st.bloqueados) { $bloqueados = [int]$st.bloqueados } } catch { }
+    $rec = [ordered]@{
+        ts          = Get-IsoNow
+        event       = 'resumo'
+        dia         = (Format-Day $Day)
+        max_mb      = $maxMb
+        teto_bytes  = (Get-ObservationBudgetLimitBytes)
+        usado_bytes = $usadoBytes
+        usado_mb    = $usadoMb
+        excedido    = $excedido
+        bloqueados  = $bloqueados
+        motivo      = $(if ($excedido) { 'teto_diario_atingido' } else { 'periodico' })
+        obsdir      = $ObsDir
+    }
+    if ($null -ne $Extra) {
+        try {
+            foreach ($k in @($Extra.Keys)) {
+                $key = [string]$k
+                if (-not $rec.Contains($key)) { $rec[$key] = $Extra[$k] }
+            }
+        } catch { }
+    }
+    # Resultado descartado de proposito: ver comentario da funcao.
+    $null = Add-JsonlRecord $ObsDir 'resumo' $rec $Day
+}
+
+# --- gravacao ---------------------------------------------------------------
+
 # Acrescenta um registro JSONL e devolve o numero da linha (1-based).
+# Contrato preservado: devolve 0 em falha, inclusive quando o teto diario de
+# disco recusa a gravacao (categorias com teto). A contagem de bytes so avanca
+# quando o WriteLine acontece de fato.
 function Add-JsonlRecord([string]$ObsDir, [string]$Category, $Record, [datetime]$Day) {
     $path = Get-JsonlPath $ObsDir $Category $Day
+    $json = $null
+    try {
+        $json = $Record | ConvertTo-Json -Compress -Depth 12
+    } catch {
+        return 0
+    }
+    if ($null -eq $json) { return 0 }
     $entry = $script:JsonlWriters[$path]
     if ($null -eq $entry) {
         try {
@@ -455,13 +628,15 @@ function Add-JsonlRecord([string]$ObsDir, [string]$Category, $Record, [datetime]
             return 0
         }
     }
+    $recBytes = Get-JsonlRecordBytes $json $entry.Writer
+    if (Test-ObservationWriteBlocked $ObsDir $Category $Day $recBytes) { return 0 }
     try {
-        $json = $Record | ConvertTo-Json -Compress -Depth 12
         $entry.Writer.WriteLine($json)
         # Dupla garantia de durabilidade imediata: flush do texto + flush do stream.
         $entry.Writer.Flush()
         $entry.Writer.BaseStream.Flush()
         $entry.Lines = [int]$entry.Lines + 1
+        $script:ObsBudgetBytes = [long]$script:ObsBudgetBytes + [long]$recBytes
         return [int]$entry.Lines
     } catch {
         return 0
@@ -516,7 +691,7 @@ function Remove-OldObservationFiles([string]$ObsDir, [datetime]$Today, [int]$Ret
     $removed = 0
     try {
         foreach ($f in Get-ChildItem -LiteralPath $ObsDir -File -ErrorAction SilentlyContinue) {
-            if ($f.Name -match '^(snapshot|processos|eventos|hash-sessoes|lacunas)-(\d{4}-\d{2}-\d{2})\.jsonl$') {
+            if ($f.Name -match '^(snapshot|processos|eventos|hash-sessoes|lacunas|resumo)-(\d{4}-\d{2}-\d{2})\.jsonl$') {
                 try {
                     $d = [datetime]::ParseExact($Matches[2], 'yyyy-MM-dd', $null)
                     if ($d -lt $cut) {

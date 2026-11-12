@@ -25,7 +25,7 @@ $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'scripts\lib.ps1')
 
 $srcScripts = Join-Path $PSScriptRoot 'scripts'
-$required = @('lib.ps1', 'observador.ps1', 'supervisor-observador.ps1', 'supervisor-dsh.ps1', 'supervisor-runner.ps1')
+$required = @('lib.ps1', 'captura.ps1', 'observador.ps1', 'supervisor-observador.ps1', 'supervisor-dsh.ps1', 'supervisor-runner.ps1')
 $missing = @()
 foreach ($f in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $srcScripts $f))) { $missing += $f }

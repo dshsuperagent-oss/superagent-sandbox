@@ -30,19 +30,40 @@ Uso operacional no dia a dia (o que fazer quando o DSH cai): [SKILL.md](SKILL.md
 | Fluxo | Intervalo | Arquivo | Pergunta que responde |
 |---|---|---|---|
 | Snapshot do alvo | 2 s | `snapshot-AAAA-MM-DD.jsonl` | o DSH estava vivo? respondendo? quantas conexões? |
-| Diff de processos | 100 ms (1º ciclo: baseline) | `processos-AAAA-MM-DD.jsonl` | **quem** apareceu/saiu, com PID, PPID, commandline e ancestrais |
+| Diff de processos | **25 ms** (thread dedicada; 1º ciclo: baseline) | `processos-AAAA-MM-DD.jsonl` | **quem** apareceu/saiu, com PID, PPID, commandline e ancestrais (ancestrais só de suspeito/filho do alvo) |
 | Event Log | 30 s | `eventos-AAAA-MM-DD.jsonl` | Kernel-Power, WER/AppCrash, erros de serviço, TaskScheduler |
 | Sessões | 30 s | `hash-sessoes-AAAA-MM-DD.jsonl` | a conversa parou de gravar em que instante? |
 | Heartbeat | 5 s | `estado.json` | o próprio observador está vivo? |
 | Lacunas | no evento | `lacunas-AAAA-MM-DD.jsonl` | o observador ficou fora e por quanto tempo |
 | Veredito | por morte | `veredito-AAAAMMDD-HHmmss.json` | classificação + confiança + evidências |
+| Resumo do dia | quando o teto de disco é atingido (1×/min) | `resumo-AAAA-MM-DD.jsonl` | o dia bateu o teto de 150 MB? quanto foi gravado e recusado |
+
+## Parâmetros do observador (principais)
+
+Todos com default seguro; nenhum exige admin.
+
+| Parâmetro | Default | Para que serve |
+|---|---|---|
+| `-DataDir` | `F:\ai\_lab\dsh-saude\observador` | raiz dos dados (`observacao\`, `logs\`) |
+| `-Port` | `3080` | porta do DSH observada |
+| `-TargetPid` | `0` = adota o dono da porta | alvo fixado por PID (usado pelos testes, com processo descartável) |
+| `-SnapshotSec` | `2` | intervalo do snapshot |
+| `-ProcessPollMs` | **`25`** | intervalo do diff de processos (era 100). O motor clampa em 10..200 ms (`captura.ps1`); é o parâmetro que decide se um processo curto aparece |
+| `-MaxDayMb` | **`150`** | teto de disco por dia para `snapshot`/`processos`/`eventos`/`hash-sessoes`. É `[double]` (aceita fração, ex. `0.2`, usada para provar o corte nos testes); `0` corta tudo |
+| `-HeartbeatSec` | `5` | intervalo do `estado.json` |
+| `-RetentionDays` | `7` | retenção dos arquivos de `observacao\` (inclui `resumo-*`) |
+| `-DurationSeconds` | `0` = infinito | encerra sozinho depois de N s (usado pelos testes) |
+| `-HttpProbe` | `curl` | probe HTTP (`curl`, `dotnet` ou `none`) |
+| `-TrimSec` | `60` | intervalo do `GC.Collect()` + `EmptyWorkingSet` no próprio processo |
+
 
 ## Árvore de diretórios
 
 ```
 F:\ai\_lab\dsh-saude\observador\
 ├─ scripts\
-│  ├─ lib.ps1                     # PEB (CommandLine/PPID), ProcSnap, JSONL, netstat
+│  ├─ lib.ps1                     # PEB (CommandLine/PPID), ProcSnap, JSONL, netstat, teto de disco
+│  ├─ captura.ps1                 # motor de captura NQSI ~25 ms + fila de enriquecimento
 │  ├─ observador.ps1              # loop principal (5 fluxos + heartbeat)
 │  ├─ supervisor-observador.ps1   # reergue o observador e registra lacunas
 │  ├─ supervisor-dsh.ps1          # sobe o DSH com -PassThru, grava ExitCode + instante
@@ -53,6 +74,7 @@ F:\ai\_lab\dsh-saude\observador\
 │  ├─ eventos-2026-11-11.jsonl
 │  ├─ hash-sessoes-2026-11-11.jsonl
 │  ├─ lacunas-2026-11-11.jsonl
+│  ├─ resumo-2026-11-11.jsonl
 │  ├─ estado.json
 │  └─ veredito-20261111-164926.json
 ├─ logs\
@@ -105,29 +127,61 @@ Queda típica vista aqui: `alive` vira `false` e o `http.code` vai a `000` na me
 amostra; `hung` = `listen:true` com `http.code:"000"` (sem resposta dentro do
 timeout de 4 s do probe) por mais de 20 s consecutivos.
 
-### `processos-AAAA-MM-DD.jsonl` — poll de 100 ms, só o diff
+### `processos-AAAA-MM-DD.jsonl` — poll de 25 ms, só o diff
+
+**Captura desacoplada (revisão 2).** O poll antigo rodava no **mesmo thread** do
+loop do observador e fazia snapshot + `Get-Process` + PEB + cadeia de ancestrais
+por processo novo; o intervalo efetivo passava de 100 ms e um `taskkill.exe` de
+~117–165 ms escapava. Agora `scripts\captura.ps1` mantém duas coisas separadas:
+
+- **thread de captura:** `NtQuerySystemInformation(SystemProcessInformation)` a
+  cada `-ProcessPollMs` (default **25 ms**), com buffer persistente, fazendo **só**
+  diff de PID/PPID/create time. Sem PEB, sem JSON, sem I/O nesse caminho. Nomes de
+  assassinos conhecidos (taskkill etc.) são resolvidos no mesmo tick.
+- **thread de enriquecimento:** consome a fila de PIDs novos e resolve nome
+  (`OpenProcess` + `QueryFullProcessImageNameW`), ppid e `cmdline` (PEB x64), e
+  também resolve as saídas pelo cache.
+
+O observador drena a fila no loop e grava no schema de sempre, acrescentando
+`poll_ms`/`seen_ms` quando existirem. Se o `Add-Type` do motor falhar, o
+observador cai no caminho antigo e continua gravando (nunca lança exceção).
 
 No boot, antes do primeiro diff, o observador grava **uma** linha
 `{"event":"baseline","count":N,...}` com a contagem de processos vinda da API
 nativa (`NtQuerySystemInformation`, sem PEB). Processos que já existiam não são
 "novos": não há dump de PIDs/commandline de todos no startup. Só quem nasce
-depois do baseline entra com PID/PPID/commandline/ancestrais. É isso que mantém o
+depois do baseline entra com PID/PPID/commandline — e, por economia de disco,
+`ancestors[]` só nos suspeitos e nos filhos do alvo. É isso que mantém o
 primeiro ciclo barato (ver "Custo medido") e impede o arquivo de crescer com
 centenas de linhas no start.
 
 ```json
-{"ts":"2026-11-11T16:49:23-03:00","event":"start","pid":8844,"ppid":6120,"name":"taskkill","cmdline":"taskkill /PID 5660 /T /F","start":"2026-11-11T16:49:23-03:00","ancestors":[{"pid":6120,"ppid":4896,"name":"powershell","cmdline":"powershell -File restart-dsh.ps1"},{"pid":4896,"ppid":400,"name":"cmd","cmdline":"cmd /c ..."}],"suspect":true,"reasons":["nome:taskkill","cmdline_suspeita","menciona_pid_alvo"],"target_pid":5660,"fonte":"peb","error":null}
+{"ts":"2026-11-11T16:49:23-03:00","event":"start","pid":8844,"ppid":6120,"name":"taskkill.exe","cmdline":"taskkill.exe /PID 5660 /T /F","start":"2026-11-11T16:49:23-03:00","ancestors":[{"pid":6120,"ppid":4896,"name":"powershell.exe","cmdline":"powershell -File restart-dsh.ps1"},{"pid":4896,"ppid":400,"name":"cmd.exe","cmdline":"cmd /c ..."}],"suspect":true,"reasons":["nome:taskkill.exe","cmdline_suspeita","menciona_pid_alvo"],"target_pid":5660,"fonte":"nqsi25","error":null,"poll_ms":25,"seen_ms":3}
 ```
 
 | Campo | Significado |
 |---|---|
 | `event` | `baseline` (1º ciclo, só contagem), `start` (novo), `exit` (saiu), `target_adopted` (alvo descoberto pela porta) ou `target_fixed` (alvo veio por `-TargetPid`) |
 | `pid`, `ppid`, `name`, `start` | identidade do processo |
-| `cmdline` | linha de comando completa (PEB) |
-| `ancestors[]` | cadeia de pais (quem mandou), com `pid`, `ppid`, `name`, `cmdline` e `error` quando a leitura falhou |
+| `cmdline` | linha de comando (PEB), truncada em 400 caracteres (1500 quando `suspect:true`); no `exit` de processo comum vem `null` — a linha já está no registro de `start` |
+| `fonte` | origem dos metadados: `nqsi25` (motor de captura novo), `peb` (PEB lido do alvo), `peb_negado` (leitura negada — motivo em `error`), `nqsi` (baseline) |
+| `error` | motivo **explícito** quando `cmdline`/`ppid` não puderam ser lidos (ex.: `OpenProcess:5`, `wow64`) — nunca falha silenciosa |
+| `ancestors[]` | cadeia de pais (quem mandou), com `pid`, `ppid`, `name`, `cmdline` e `error` quando a leitura falhou. Por economia de disco (churn chega a ~500 MB/dia) só é preenchida para processo **suspeito** ou filho do alvo; nos demais vem `[]` |
 | `suspect` / `reasons[]` | o processo casou um padrão de risco (`nome:taskkill`, `cmdline_suspeita`, `menciona_pid_alvo`, `descendente_do_alvo`) |
 | `target_pid` | PID do DSH no momento da captura |
+| `poll_ms` / `seen_ms` | (revisão 2) intervalo configurado do poll e latência captura→registro |
 | `alvo_vivo_no_fim` | (só no `exit`) `true` = o alvo ainda estava vivo quando o suspeito saiu; o observador **não** cita esse processo como assassino |
+
+`target_fixed` e o `exit` do alvo trazem **ppid e cmdline do próprio alvo** (o PEB
+é lido no início, com o processo vivo). Se a leitura for negada (outro
+usuário/integridade, processo wow64), `cmdline` vem `null` **com o motivo em
+`error`** e no log — não fica em branco sem explicação.
+
+**Economia de disco:** `ancestors[]` só é preenchido em `start` de processo
+**suspeito** ou filho do alvo, e o `exit` de processo comum vem com
+`cmdline=null` e `ancestors=[]` — o `start` do mesmo PID já tem esses dados.
+Se um `exit` aparecer sem `cmdline`, procure o `start` do PID antes de dizer que a
+leitura falhou.
 
 Padrões que marcam `suspect:true` (obrigatórios na issue): `taskkill`, `powershell`,
 `node` e qualquer commandline com `3080`, `taskkill`, `Stop-Process` ou o PID do
@@ -173,8 +227,15 @@ diário baixo.
 ### `estado.json` — heartbeat a cada 5 s
 
 ```json
-{"pid":7312,"iniciado":"2026-11-11T18:59:58-03:00","ultimo_ciclo":"2026-11-11T19:07:21-03:00","versao":"1.0.0","alvo_pid":5660,"porta":3080,"data_dir":"F:\\ai\\_lab\\dsh-saude\\observador","ciclos":86,"erros":0,"amostras":{"snapshot":209,"processos":4200,"eventos":14,"sessoes":14}}
+{"pid":7312,"iniciado":"2026-11-11T18:59:58-03:00","ultimo_ciclo":"2026-11-11T19:07:21-03:00","versao":"1.1","alvo_pid":5660,"porta":3080,"data_dir":"F:\\ai\\_lab\\dsh-saude\\observador","ciclos":86,"erros":0,"poll_ms":25,"max_day_mb":150,"amostras":{"snapshot":209,"processos":4200,"eventos":14,"sessoes":14},"disco":{"max_mb":150,"usado_bytes":5242880,"usado_mb":5.0,"excedido":false,"bloqueados":0,"dia":"2026-11-11"},"captura":{"ok":true,"interval_ms":25,"ticks":4200,"visiveis":41,"enfileirados":120,"fila":0,"descartados":0}}
 ```
+
+Na revisão 2 (`versao` 1.1) o heartbeat passou a trazer também `poll_ms`,
+`max_day_mb`, `disco` (estado do teto: usado, excedido, bloqueados) e `captura`
+(estado do motor: `ok`, `interval_ms`, `ticks`, `visiveis`, `enfileirados`,
+`fila`, `descartados`). Se `captura.ok` for `false` e `motor_erro` estiver
+preenchido, o observador está no caminho antigo e o motivo está ali — não presuma
+que o poll de 25 ms está ativo.
 
 `ultimo_ciclo` com mais de **15 s** de atraso indica observador atrasado; o
 `supervisor-observador.ps1` só considera falha e reergue quando passa de
@@ -202,7 +263,7 @@ observador estava vivo e qual alvo seguia.
     {"fonte": "processos-2026-11-11.jsonl", "linha": 1412, "hora": "2026-11-11T16:49:23-03:00", "trecho": "{\"event\":\"start\",\"pid\":8844,\"name\":\"taskkill\",\"target_pid\":5660}"}
   ],
   "timeline": [{"hora": "2026-11-11T16:49:23-03:00", "evento": "assassino", "detalhe": "taskkill pid=8844"}],
-  "limitacoes": ["Sem admin nao ha ETW/WMI process events/4688: processos com vida menor que o intervalo de poll (100 ms) podem escapar."]
+  "limitacoes": ["Sem admin nao ha ETW/WMI process events/4688: processos com vida menor que o intervalo de poll (25 ms) podem escapar."]
 }
 ```
 
@@ -222,6 +283,32 @@ gravar). `acao` é `reiniciado`, `observador_travado_encerrado_e_reiniciado`,
 `falha_ao_encerrar_observador_travado`, `reinicio_falhou` ou `nenhuma` (com
 `-NoStart`). Se houver lacuna cobrindo o instante da queda, o veredito daquela
 janela é `unknown` — e isso deve ser dito, não escondido.
+
+### `resumo-AAAA-MM-DD.jsonl` — o dia bateu o teto de disco
+
+O teto é `-MaxDayMb` (default **150 MB/dia**). A contagem conta os bytes UTF-8
+**realmente gravados** no dia, somando todas as categorias (inclusive `resumo`),
+e é inicializada lendo os JSONL do dia que já estão no disco — um restart no meio
+do dia não zera o teto. Ao atingi-lo, `Add-JsonlRecord` recusa novas gravações de
+`snapshot`, `processos`, `eventos` e `hash-sessoes` (devolve `0`, contrato antigo
+preservado) e o observador **continua rodando**; o disco não cresce sem limite.
+`resumo`, `lacunas` e os logs nunca são bloqueados.
+
+Quando o teto estoura, o observador grava o resumo (no máximo 1×/min e 1× na
+transição):
+
+```json
+{"ts":"2026-11-11T21:40:00-03:00","event":"resumo","dia":"2026-11-11","max_mb":150,"teto_bytes":157286400,"usado_bytes":157290112,"usado_mb":150.004,"excedido":true,"bloqueados":37,"motivo":"teto_diario_atingido","obsdir":"F:\\ai\\_lab\\dsh-saude\\observador\\observacao"}
+```
+
+`motivo` é `teto_diario_atingido` quando `excedido=true`; no resumo periódico é
+`periodico`. `bloqueados` é quantos registros foram recusados no dia. A retenção
+(`-RetentionDays`) apaga `resumo-*` antigo como as demais categorias.
+
+> **O que o teto custa:** ao cortar, o dia perde registros de processo/snapshot e
+> a perícia daquele dia fica **incompleta**. O veredito continua sendo gerado (usa
+> o que está em memória), mas a evidência em JSONL pode faltar — leia
+> `resumo-*.jsonl` antes de concluir que "não houve registro".
 
 ### `logs\dsh-console-timestamped.log` e `logs\supervisor-AAAA-MM-DD.jsonl`
 
@@ -255,7 +342,7 @@ stack = crash**. ExitCode `-1` (`4294967295`) é o típico de processo morto por
 
 | Veredito | Significado | Confiança alta quando | O que ainda pode enganar |
 |---|---|---|---|
-| `killed` | alguém encerrou o DSH | o registro do assassino em `processos.jsonl` tem `cmdline` citando o PID do DSH (ou nome `taskkill`) **e** `ppid`/`ancestrais[]` legíveis — o código pontua e exige score ≥12 para `alta` | assassino elevado (PEB ilegível) ou processo que viveu < 100 ms |
+| `killed` | alguém encerrou o DSH | o registro do assassino em `processos.jsonl` tem `cmdline` citando o PID do DSH (ou nome `taskkill`) **e** `ppid`/`ancestrais[]` legíveis — o código pontua e exige score ≥12 para `alta` | assassino elevado (PEB ilegível) ou processo que viveu < ~25 ms |
 | `crashed` | o DSH morreu sozinho | `ExitCode != 0` **e** stack no console com timestamp, ou WER/AppCrash em `eventos.jsonl` | exit 1 sem stack = encerrado, não crash |
 | `hung` | vivo, mas sem responder | `listen:true` e `http.code:"000"` por mais de 20 s em `snapshot.jsonl` | lentidão momentânea de 1–2 amostras não é hang |
 | `unknown` | dados insuficientes | — (é o veredito da falta de prova) | lacuna do observador, queda entre amostras, sem registro de processo/evento |
@@ -329,11 +416,17 @@ Medição de 10 min (600 s, 30 amostras a cada 20 s) com o observador monitorand
 | Volume gravado | **~45 MB/dia** projetado (snapshot 13,6 MB + processos ~26 MB + sessões/eventos/logs) | < 200 MB/dia |
 | Impacto no DSH | probe é `GET /` somente leitura; DSH respondeu 401 em ~1–4 ms; o probe com spawn do `curl` mede 12,7 ms médio / 45 ms máx | — |
 
-O polling de processos é de 100 ms (contra 2 s do snapshot) para não perder o
-assassino; é o item mais caro. Para caber em <80 MB de working set, o observador
-faz `GC.Collect()` + `EmptyWorkingSet` no próprio processo **1×/min** (`-TrimSec
-60`); o commit privado fica ~75 MB e o working set ~40 MB. Isso não toca no DSH
-nem em outro processo. Números brutos da medição em
+O polling de processos é de **25 ms** (contra 2 s do snapshot) para não perder o
+assassino; é o item mais caro. Na revisão 2 ele saiu do thread do loop: a thread
+de captura faz só o diff de PID/PPID pela API nativa e o trabalho pesado
+(nome/cmdline/PEB/ancestrais) vai para uma fila de enriquecimento, então o
+intervalo efetivo não infla mais com o tamanho do snapshot. **Os números desta
+seção foram medidos com o poll de 100 ms da revisão anterior**; o custo do poll
+de 25 ms é remedido na revisão 2 (issue #33) e não é extrapolado aqui. Para caber
+em <80 MB de working set, o observador faz `GC.Collect()` + `EmptyWorkingSet` no
+próprio processo **1×/min** (`-TrimSec 60`); o commit privado fica ~75 MB e o
+working set ~40 MB. Isso não toca no DSH nem em outro processo. Números brutos da
+medição em
 [`TESTES.md`](../../docs/dsh-maintenance/TESTES.md#5-custo-10-min--pass).
 
 ### Inicialização e primeiro dump (issue #32, medição A/B)
@@ -378,7 +471,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tes
 powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-install.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-hung.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-parse.ps1
+
+# revisao 2 (issue #33)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-captura-curta.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-disco.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-captura-taskkill-real.ps1
 ```
+
+- **Captura curta (25 ms)**: 50 processos `cmd.exe /c exit` com taxa de captura
+  por PID ≥ 95%, mais uma leva de ~120 ms como calibração do `taskkill` real.
+- **Disco e teto**: churn de 2 min medindo bytes/min → MB/dia, e o teto provado
+  com `-MaxDayMb` pequeno (corte + `resumo-*.jsonl`).
+- **`taskkill` real (aceite)**: 3 execuções de `taskkill /PID <alvo> /F` com
+  `veredito=killed`, assassino `taskkill`, `ppid > 0` e `cmdline` com
+  `/PID <alvo>`; PASS só 3/3. **Só roda em shell normal** (no shell restrito do
+  agente o `taskkill` recebe "Acesso negado" e o teste sai com SKIP/exit 3).
+  Também disponível no caminho literal `.\tests\test-captura-taskkill-real.ps1`
+  (forwarder que chama o script da skill).
 
 - **Captura de assassino (sintética, sem tocar no DSH)**: processo descartável
   morto por um processo externo cujo commandline cita o PID; `processos.jsonl` +
@@ -417,11 +526,23 @@ Trechos reais de cada teste em [`TESTES.md`](../../docs/dsh-maintenance/TESTES.m
   iniciou entram só na contagem (`{"event":"baseline"}`, sem `start`/`cmdline`).
   Um assassino que já estivesse vivo antes do observador não terá registro de
   `start`; a morte do alvo continua no `snapshot`/veredito.
-- **Polling de 100 ms não é gancho do kernel.** Processo que nasce e morre em
-  menos de 100 ms pode não aparecer em `processos.jsonl`; a janela entre duas
-  amostras é um ponto cego. Nesta máquina um `taskkill /F` bem-sucedido fica
-  visível por ~117–165 ms (8 medições em `TESTES.md` §1c), mas um `taskkill` que
-  falha sai em < 50 ms.
+- **Polling de 25 ms não é gancho do kernel.** Processo que nasce e morre em
+  menos de ~25 ms ainda pode escapar: a janela entre duas amostras é um ponto
+  cego. Nesta máquina um `taskkill /F` bem-sucedido fica visível por ~117–165 ms
+  (8 medições em `TESTES.md` §1c) — folga de vários ticks —, mas um `taskkill` que
+  falha sai bem mais rápido e pode não aparecer.
+- **Processo wow64 (32 bits) não tem `cmdline`:** o PEB lido é x64; o registro vem
+  com `error='wow64'` e `cmdline` nulo, mantendo `name`/`pid`/`ppid` válidos.
+- **O `taskkill` real só é validado pelo Lead, em shell normal.** O shell do
+  agente roda em job restrito: `Get-Process` enxerga 40 processos (medido) e o
+  `taskkill.exe` recebe "Acesso negado". No sandbox o teste de aceite retorna SKIP
+  (exit 3) e, na melhor das hipóteses, prova só a captura do `taskkill.exe` (com
+  `cmdline` vazio e `error` explícito). Não existe PASS de `taskkill` real medido
+  neste ambiente.
+- **Teto de disco corta dados:** quando o dia atinge `-MaxDayMb` (150 MB), os
+  registros de `snapshot`/`processos`/`eventos`/`hash-sessoes` param de ser
+  gravados e a perícia daquele dia fica incompleta — o `resumo-*.jsonl` diz o
+  motivo e quantos registros foram recusados.
 - Um `taskkill`/`Stop-Process` que **saiu com o alvo ainda vivo** não é citado
   como assassino (campo `alvo_vivo_no_fim` no registro de saída).
 - `snapshot` de 2 s pode perder uma morte seguida de subida imediata (troca de

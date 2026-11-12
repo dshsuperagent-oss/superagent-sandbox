@@ -16,6 +16,129 @@ Ambiente: Windows 11 build 22621, PowerShell 5.1.22621.4249, sem admin,
 > `-Killer taskkill` foi executado para provar a captura do `taskkill.exe`
 > (bloqueado). O teste com `taskkill` real deve ser rodado pelo Lead em um shell
 > normal — o script é o mesmo.
+>
+> Na revisão 2 (issue #33) isso virou um teste separado e explícito:
+> `test-captura-taskkill-real.ps1` prova o `taskkill` real 3/3 em shell normal e
+> sai com **SKIP (exit 3)** neste sandbox. Ver seção R2.
+
+## R2. Revisão 2 (issue #33) — 3 testes novos
+
+O problema medido na verificação da PR #31: o `taskkill.exe` que **consegue**
+matar vive ~117–165 ms (seção 1c) e o poll antigo rodava no **mesmo thread** do
+loop do observador (snapshot + `Get-Process` + PEB + cadeia de ancestrais), então
+o intervalo efetivo passava de 100 ms e o processo curto escapava. O motor novo
+(`scripts\captura.ps1`) desacopla: thread dedicada de
+`NtQuerySystemInformation` a cada ~25 ms fazendo **só** diff de PID/PPID/create
+time, com nome/cmdline/PEB/ancestrais resolvidos por uma fila de enriquecimento
+(no JSONL, `ancestors[]` só vai para suspeito/filho do alvo e o `exit` comum vem
+sem `cmdline` — economia de disco).
+Nenhum dos três testes abaixo toca no DSH: o alvo é um `powershell.exe` descartável
+e o observador usa `-DataDir` próprio (dentro de `work\<ticket>\.out\`).
+
+| Teste (em `skills\dsh-maintenance\tests\`) | O que prova | Evidência esperada | Exit |
+|---|---|---|---|
+| `test-captura-curta.ps1` | captura de processos curtos (`cmd.exe /c exit`) e de processos de ~120 ms com o poll novo | taxa de captura ≥ 95% em 50 processos, case por PID no `processos-*.jsonl`, mais a taxa medida da 2ª leva (~120 ms) | `0` = PASS, `1` = FAIL |
+| `test-disco.ps1` | volume de disco sob churn de 2 min e o teto diário funcionando | bytes/min medidos → projeção MB/dia; com `-MaxDayMb` pequeno: gravações recusadas + linha em `resumo-*.jsonl` | `0` = PASS, `1` = FAIL |
+| `test-captura-taskkill-real.ps1` | o aceite da issue: `taskkill /PID <alvo> /F` **real** capturado e classificado | 3/3 execuções com `veredito=killed`, `assassino.nome` com `taskkill`, `ppid > 0`, `cmdline` com `/PID <alvo>` e registro `event=start` do taskkill na `processos-*.jsonl` | `0` = PASS (3/3), `1` = FAIL, `2` = pré-requisito ausente, `3` = SKIP |
+
+Comandos, a partir da raiz do clone:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-captura-curta.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-disco.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\skills\dsh-maintenance\tests\test-captura-taskkill-real.ps1
+```
+
+> `test-captura-curta` e `test-disco` terminam com `0` (PASS) / `1` (FAIL) —
+> conferido nos próprios scripts; `test-captura-taskkill-real` usa também `2`
+> (observador ou `taskkill.exe` ausente) e `3` (SKIP). As seções de evidência de
+> cada teste só são preenchidas com execução real — enquanto não houver, este
+> documento não traz taxa de captura nem MB/dia inventados.
+
+### R2a. `test-captura-taskkill-real.ps1` — o aceite (só o Lead roda em shell normal)
+
+O script faz **3 execuções independentes**. Em cada uma: cria o alvo descartável
+(`powershell -NoProfile -Command "Start-Sleep 300"`), sobe o observador com
+`-DataDir` próprio + `-TargetPid <alvo>` + `-DurationSeconds 150`, espera o
+heartbeat, espera ~1 s, executa `taskkill.exe /PID <alvo> /F` guardando a saída e
+o instante, espera o veredito (até 15 s) e confere no `veredito-*.json`:
+
+| Check | Regra |
+|---|---|
+| classificação | `veredito = killed` |
+| alvo | `alvo.pid` = PID do alvo descartável |
+| assassino | `assassino.nome` contém `taskkill` |
+| pai | `assassino.ppid > 0` |
+| linha de comando | `assassino.cmdline` contém `/PID <alvo>` (o PID do alvo sozinho é aceito como *fallback*, com `AVISO` impresso) |
+| prova no JSONL | existe `event=start` com `name` de taskkill e o PID do alvo em `processos-*.jsonl` |
+
+Cada execução imprime PID do taskkill, `ppid`, `cmdline`, veredito, tempo
+morte→veredito e o `lifetime_ms` do registro de `exit`. `PASS` só com **3/3**
+(exit 0); qualquer falha real → exit 1 com o resumo das falhas. Defaults dos
+timeouts: `-TimeoutSec 60` (heartbeat, igual aos outros testes) e
+`-VerdictTimeoutSec 15` (veredito) — ambos ajustáveis por parâmetro.
+
+O caminho literal pedido pela issue também existe como forwarder curto
+(`repo\tests\test-captura-taskkill-real.ps1`), que repassa o `-RepoRoot` e devolve
+o mesmo exit code:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test-captura-taskkill-real.ps1
+```
+
+**Neste shell do agente o taskkill é bloqueado** (`ERRO: Acesso negado`; exit 1).
+O script detecta isso, imprime o SKIP e sai com exit **3** — não finge PASS:
+
+```
+[21:13:16]    alvo descartavel pid=17992
+[21:13:16]    observador pid=31072 (DataDir proprio, so leitura)
+[21:13:17]    heartbeat fresco; alvo fixado
+[21:13:18]    assassinato: taskkill.exe /PID 17992 /F
+     taskkill: ERRO: Acesso negado
+     taskkill: System.Management.Automation.RemoteException
+[21:13:19]    taskkill NAO matou (exit=1); registros de taskkill capturados nesta execucao: 0
+RESULTADO: SKIP (taskkill bloqueado neste shell - rodar em shell normal/Explorer)
+```
+
+(A linha `System.Management.Automation.RemoteException` é ruído do
+`ErrorRecord` que o PowerShell anexa à saída do executável — não é erro do teste.)
+
+Ou seja: **no sandbox do agente o aceite não pode ser provado**; o que se prova,
+às vezes, é só a **captura** do `taskkill.exe` (ver R2b). A prova de classificação
+com `taskkill` real é do Lead, em shell normal/Explorer. Não existe resultado 3/3
+registrado aqui — quem rodar em shell normal deve colar a saída real nesta seção.
+
+### R2b. O que o sandbox já prova (captura, não aceite) — com o motor novo
+
+Execução do teste acima em 2026-11-11 21:16, com o observador já na revisão 2
+(`versao` 1.1, motor `nqsi25`, poll de 25 ms). O `taskkill` foi bloqueado (exit 1)
+e o alvo continuou vivo, então **não houve `killed`** — mas a captura e o
+preenchimento do alvo funcionaram:
+
+| Medida | Valor observado |
+|---|---|
+| motor | `motor de captura ativo: poll 25 ms (nqsi), visiveis=55` |
+| baseline | `{"event":"baseline","count":55,...}` |
+| `target_fixed` | `ppid=22704` e `cmdline` do alvo legíveis (fonte `peb`, `error` nulo) |
+| `taskkill.exe` | `event=start` com `pid=24424`, `ppid=22704`, `seen_ms=0`; `exit` com `lifetime_ms=89` e `alvo_vivo_no_fim=true` |
+
+Trecho real (encurtado) da `processos-*.jsonl`:
+
+```json
+{"ts":"2026-11-11T21:16:51.223-03:00","event":"start","pid":24424,"ppid":22704,"name":"taskkill.exe","cmdline":"","start":"2026-11-11T21:16:51.1726988-03:00","suspect":true,"reasons":["nome:taskkill.exe"],"target_pid":28372,"fonte":"nqsi25","error":"QueryFullProcessImageName:5","poll_ms":25,"seen_ms":0}
+```
+
+O `cmdline` veio vazio porque o `taskkill.exe` disparado do shell restrito roda
+com token limitado e a leitura falhou **com motivo explícito**
+(`QueryFullProcessImageName:5`) — não silencioso. O `alvo_vivo_no_fim=true` marcou
+o processo como **inocente**, que é o correto: ele não matou o alvo. Em um shell
+normal o mesmo registro deve vir com `cmdline` contendo `/PID <alvo>` — é
+exatamente isso que o aceite exige.
+
+> Medição desta execução: o `taskkill` **bloqueado** ficou visível por
+> `lifetime_ms=89` e foi pego no primeiro tick (`seen_ms=0`). O número antigo de
+> "< 50 ms" para taskkill que falha (seção 1c) não vale como regra geral — o que
+> importa é que, no shell normal, o `taskkill` que mata vive ~117–165 ms.
 
 ## 0. Correções da issue #32 (revisão da PR #31) — PASS
 
